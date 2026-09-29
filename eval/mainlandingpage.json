@@ -1,0 +1,22 @@
+{
+  "project": "MainLandingPage",
+  "note": "Ground truth taken from the project's own CONTEXT.md. A question passes if any file in `expect` is in the top-k hits.",
+  "questions": [
+    {"q": "where is the list of active locales defined", "expect": ["src/routes.js"]},
+    {"q": "why does each locale get its own i18next instance", "expect": ["src/i18n.js"]},
+    {"q": "how are static html pages generated at build time", "expect": ["scripts/prerender.mjs"]},
+    {"q": "which file renders the react app to a string for the server", "expect": ["src/entry-server.jsx"]},
+    {"q": "where does client hydration happen", "expect": ["src/entry-client.jsx"]},
+    {"q": "where are canonical tags and hreflang generated", "expect": ["src/seo/headTags.js"]},
+    {"q": "how is the sitemap built", "expect": ["scripts/sitemap-plugin.mjs"]},
+    {"q": "which component lets users switch language", "expect": ["src/components/LanguageSwitcher.jsx"]},
+    {"q": "where is the router configured", "expect": ["src/App.jsx"]},
+    {"q": "why is Russian not live yet and where is its copy", "expect": ["src/locales/ru.json", "src/routes.js"]},
+    {"q": "how is the site served in production without a spa rewrite", "expect": ["firebase.json"]},
+    {"q": "how do I preview the built site locally", "expect": ["scripts/serve-static.mjs"]},
+    {"q": "what are the service keys for the four things the studio sells", "expect": ["src/routes.js"]},
+    {"q": "what happens when a route redirects during server render", "expect": ["src/entry-server.jsx"]},
+    {"q": "where do route paths for each locale come from", "expect": ["src/routes.js"]},
+    {"q": "where are the coding rules for contributors", "expect": ["AGENTS.md"]}
+  ]
+}

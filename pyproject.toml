@@ -1,0 +1,27 @@
+[project]
+name = "layatools"
+version = "0.1.0"
+description = "System-1 decision gateway for LLMs, built on Laya"
+readme = "README.md"
+authors = [
+    { name = "Artūrs Palamarčuks", email = "arturspalamarcuks@inbox.lv" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "laya[mcp]>=0.3.21",
+    "pydantic>=2.13.5",
+    "pyyaml>=6.0.3",
+]
+
+[project.scripts]
+layatools = "layatools.cli:main"
+layatools-mcp = "layatools.server:main"
+
+[build-system]
+requires = ["uv_build>=0.12.20,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

@@ -1,0 +1,11 @@
+name: relevance
+description: How relevant is a file or snippet to a task? Used by `layatools rank` to find where to look in an unfamiliar codebase.
+min_confidence: 0.6
+questions:
+  relevant:
+    type: noul
+    instructions: Would someone doing the work described in `task` need to read `content`?
+  relevance:
+    type: score
+    instructions: How useful is `content` for the work described in `task`?
+    criteria: [unrelated, tangential, useful background, directly needed]

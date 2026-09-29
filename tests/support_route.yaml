@@ -1,0 +1,15 @@
+name: support_route
+description: Route a support message to a department and flag urgency.
+min_confidence: 0.75
+state_field: message
+questions:
+  department:
+    type: choice
+    instructions: Which department should handle `message`?
+    criteria:
+      billing: invoices, payments, refunds
+      technical: bugs, outages, errors
+      other: everything else
+  urgent:
+    type: noul
+    instructions: Does `message` communicate time pressure?

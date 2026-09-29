@@ -1,0 +1,22 @@
+{
+  "project": "mireglass",
+  "note": "Held-out set: written before running lt on this project. Ground truth from file names and CONTEXT.md.",
+  "questions": [
+    {"q": "where is the newsletter signup page", "expect": ["src/pages/newsletter.astro"]},
+    {"q": "which layout wraps every page", "expect": ["src/layouts/Base.astro"]},
+    {"q": "how is the contact form submitted", "expect": ["src/scripts/contact-form.ts"]},
+    {"q": "where is the astro build configured", "expect": ["astro.config.mjs"]},
+    {"q": "where is the 404 page", "expect": ["src/pages/404.astro"]},
+    {"q": "which check verifies colour contrast", "expect": ["e2e/factory/contrast.spec.mjs"]},
+    {"q": "which test checks prefers-reduced-motion behaviour", "expect": ["e2e/factory/reduced-motion.spec.mjs"]},
+    {"q": "which test makes sure tap targets are big enough", "expect": ["e2e/factory/tap-targets.spec.mjs"]},
+    {"q": "where is the sitemap and canonical link check", "expect": ["e2e/factory/seo-site.spec.mjs", "e2e/factory/seo-meta.mjs"]},
+    {"q": "which test finds placeholder legal text on the privacy page", "expect": ["e2e/factory/legal-complete.spec.mjs"]},
+    {"q": "where is the visual regression test", "expect": ["e2e/factory/visual.spec.mjs"]},
+    {"q": "which check makes sure keyboard focus is visible", "expect": ["e2e/factory/focus-visible.spec.mjs"]},
+    {"q": "where is the press fact sheet page", "expect": ["src/pages/press.astro"]},
+    {"q": "how is the built site served locally for the tests", "expect": ["e2e/factory/serve.mjs"]},
+    {"q": "which test checks the mobile menu and other behaviours", "expect": ["e2e/factory/behaviors.spec.mjs"]},
+    {"q": "where is the description of what the game world is about", "expect": ["src/pages/world.astro"]}
+  ]
+}
