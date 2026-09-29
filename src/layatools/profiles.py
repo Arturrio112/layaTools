@@ -9,6 +9,7 @@ import yaml
 from pydantic import BaseModel, Field
 
 DEFAULT_MIN_CONFIDENCE = 0.7
+MODELS_DIR = Path.home() / ".local" / "share" / "layatools" / "models"
 
 
 class Profile(BaseModel):
@@ -19,6 +20,8 @@ class Profile(BaseModel):
     questions: dict[str, dict[str, Any]]
     min_confidence: float = Field(DEFAULT_MIN_CONFIDENCE, ge=0.0, le=1.0)
     state_field: str | None = None
+    # Name of a fine-tuned checkpoint under MODELS_DIR; falls back to the default Router when absent.
+    model: str | None = None
 
     def summary(self) -> dict[str, Any]:
         """Token-lean description for `list_decisions`."""

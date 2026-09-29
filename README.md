@@ -45,6 +45,23 @@ afterwards `lt search` fuses keyword, name and embedding rankings automatically 
 the fly; falls back to keyword-only if the daemon is down; `--lexical` forces that). Top-5 accuracy:
 MainLandingPage 12 -> 15/16, mireglass 14 -> 14/16 (grep: 4/16, 3/16).
 
-`--judge` re-ranks with Laya via the Python daemon (`layatools serve-http`); with the base model it
-does not improve results yet (see eval notes), so it is opt-in.
+`--judge` re-ranks the top candidates with a fine-tuned Laya relevance judge (via the Python daemon,
+`layatools serve-http`), fused with the retrieval order. Opt-in. See "Fine-tuning" below.
+
+## Fine-tuning the judge (`train/`)
+
+Question/chunk training data from 10 open-source repos (questions written by Claude subagents, hard
+negatives mined with `lt`); `cobra` and `commander.js` are held out entirely.
+
+```bash
+python train/sample_chunks.py <oss_dir> <data_dir>            # sample chunks (then write *.questions.jsonl)
+python train/build_dataset.py <oss_dir> <data_dir> cases.jsonl
+python train/train_relevance.py cases.jsonl train/out/laya-code-relevance-v2 --epochs 3   # ~36 min, RTX 5080
+python train/eval_judge.py cases.jsonl <model> ...             # held-out top-1 / MRR
+cp -r train/out/laya-code-relevance-v2 ~/.local/share/layatools/models/laya-code-relevance
+```
+
+Held-out repos (240 questions, ~5 candidates each): base Laya top-1 0.48 / MRR 0.67 -> tuned 0.86 / 0.93.
+On the two real eval projects the judge is roughly neutral (top-1 9/16 both, with or without it), so it
+is not on by default.
 Held-out eval (mireglass, 16 questions): right file in top 5 for 14/16 vs 3/16 for grep.

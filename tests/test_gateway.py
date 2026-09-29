@@ -10,7 +10,7 @@ class FakeBackend:
     def __init__(self):
         self.calls = []
 
-    def predict(self, state, questions):
+    def predict(self, state, questions, model=None):
         self.calls.append((state, questions))
         return {
             "answers": {
@@ -59,7 +59,7 @@ def test_list_decisions(gateway):
 
 def test_rank_orders_by_score():
     class Rank:
-        def predict(self, state, questions):
+        def predict(self, state, questions, model=None):
             hit = "auth" in state["content"]
             return {"answers": {"relevance": {"score": 2.5 if hit else 0.2},
                                 "relevant": {"noul": 0.9 if hit else 0.1}}}

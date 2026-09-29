@@ -37,7 +37,7 @@ class Gateway:
         threshold = prof.min_confidence if min_confidence is None else min_confidence
         if isinstance(state, str):
             state = {prof.state_field or "message": state}
-        raw = self.backend.predict(state, prof.questions)
+        raw = self.backend.predict(state, prof.questions, prof.model)
         return compact(raw["answers"], threshold)
 
 
@@ -51,7 +51,7 @@ class Gateway:
         prof = self.profiles[profile]
         scored = []
         for item_id, text in items.items():
-            raw = self.backend.predict({"task": task, "content": text}, prof.questions)["answers"]
+            raw = self.backend.predict({"task": task, "content": text}, prof.questions, prof.model)["answers"]
             score = float(raw["relevance"]["score"])
             p_rel = float(raw["relevant"]["noul"])
             scored.append({"id": item_id, "score": round(score, 2), "p": round(p_rel, 2)})

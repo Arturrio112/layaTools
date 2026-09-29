@@ -61,6 +61,9 @@ fn semantic_rows(index: &Index, q: &[f32], limit: usize) -> Result<Vec<Row>> {
     Ok(rows)
 }
 
+/// Weight of the Laya judge relative to the retrieval order when fusing.
+const JUDGE_WEIGHT: f64 = 1.0;
+
 /// Weight of the semantic list relative to the whole-chunk keyword list.
 const SEM_WEIGHT: f64 = 1.0;
 
@@ -150,7 +153,10 @@ pub fn judge(question: &str, hits: &mut Vec<Hit>) -> Result<()> {
     crate::judge::ensure_daemon()?;
     let items: HashMap<String, String> = hits
         .iter()
-        .map(|h| (format!("{}:{}-{}", h.path, h.start, h.end), h.text.chars().take(1500).collect()))
+        .map(|h| {
+            let body: String = h.text.chars().take(1500).collect();
+            (format!("{}:{}-{}", h.path, h.start, h.end), format!("file: {}\n{}", h.path, body))
+        })
         .collect();
     let ranked: Vec<serde_json::Value> = ureq::post(&format!("{}/v1/rank", crate::judge::URL))
         .timeout(std::time::Duration::from_secs(120))
@@ -163,6 +169,19 @@ pub fn judge(question: &str, hits: &mut Vec<Hit>) -> Result<()> {
     for h in hits.iter_mut() {
         h.laya = scores.get(&format!("{}:{}-{}", h.path, h.start, h.end)).copied();
     }
-    hits.sort_by(|a, b| b.laya.partial_cmp(&a.laya).unwrap_or(std::cmp::Ordering::Equal));
+    // Fuse rather than replace: keep the retrieval order (name + keyword + semantic signals the
+    // judge cannot see) and blend in the judge's order by reciprocal rank.
+    let mut by_judge: Vec<usize> = (0..hits.len()).collect();
+    by_judge.sort_by(|&a, &b| hits[b].laya.partial_cmp(&hits[a].laya).unwrap_or(std::cmp::Ordering::Equal));
+    let mut judge_rank = vec![0usize; hits.len()];
+    for (rank, &i) in by_judge.iter().enumerate() {
+        judge_rank[i] = rank;
+    }
+    let fused: Vec<f64> =
+        (0..hits.len()).map(|i| 1.0 / (RRF_K + i as f64) + JUDGE_WEIGHT / (RRF_K + judge_rank[i] as f64)).collect();
+    let mut order: Vec<usize> = (0..hits.len()).collect();
+    order.sort_by(|&a, &b| fused[b].partial_cmp(&fused[a]).unwrap_or(std::cmp::Ordering::Equal));
+    let sorted: Vec<Hit> = order.into_iter().map(|i| hits[i].clone()).collect();
+    *hits = sorted;
     Ok(())
 }

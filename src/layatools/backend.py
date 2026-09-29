@@ -6,7 +6,9 @@ from typing import Any, Protocol
 
 
 class Backend(Protocol):
-    def predict(self, state: dict[str, Any], questions: dict[str, Any]) -> dict[str, Any]: ...
+    def predict(
+        self, state: dict[str, Any], questions: dict[str, Any], model: str | None = None
+    ) -> dict[str, Any]: ...
 
 
 def _default_device() -> str:
@@ -21,8 +23,27 @@ class LayaBackend:
     def __init__(self, preload: bool = False) -> None:
         self._preload = preload
         self._router: Any = None
+        self._tuned: dict[str, Any] = {}
 
-    def predict(self, state: dict[str, Any], questions: dict[str, Any]) -> dict[str, Any]:
+    def _device(self) -> str:
+        import os
+
+        return os.environ.get("LAYATOOLS_DEVICE") or _default_device()
+
+    def predict(
+        self, state: dict[str, Any], questions: dict[str, Any], model: str | None = None
+    ) -> dict[str, Any]:
+        """`model` names a fine-tuned checkpoint in MODELS_DIR; if it is not installed, use the Router."""
+        if model:
+            from .profiles import MODELS_DIR
+
+            path = MODELS_DIR / model
+            if path.is_dir():
+                if model not in self._tuned:
+                    import laya
+
+                    self._tuned[model] = laya.load(str(path), device=self._device())
+                return self._tuned[model].predict(state, questions)
         if self._router is None:
             import os
 

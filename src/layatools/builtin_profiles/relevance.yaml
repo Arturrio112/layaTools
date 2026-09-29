@@ -1,6 +1,7 @@
 name: relevance
 description: How relevant is a file or snippet to a task? Used by `layatools rank` to find where to look in an unfamiliar codebase.
 min_confidence: 0.6
+model: laya-code-relevance
 questions:
   relevant:
     type: noul

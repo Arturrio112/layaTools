@@ -47,6 +47,8 @@ enum Cmd {
         #[arg(long)]
         embed: bool,
     },
+    /// Print every indexed chunk as JSON lines (for building training data)
+    Export,
     /// Serve searches over local HTTP (keeps indexes in memory)
     Serve {
         #[arg(long, default_value_t = 8766)]
@@ -82,6 +84,15 @@ fn main() -> Result<()> {
     let stats = idx.sync()?;
     match cli.cmd {
         Cmd::Serve { .. } => unreachable!("handled above"),
+        Cmd::Export => {
+            let mut stmt = idx.conn.prepare("SELECT file, start, end, text FROM chunks ORDER BY file, start")?;
+            let rows = stmt.query_map([], |r| {
+                Ok(serde_json::json!({"file": r.get::<_, String>(0)?, "start": r.get::<_, i64>(1)?, "end": r.get::<_, i64>(2)?, "text": r.get::<_, String>(3)?}))
+            })?;
+            for row in rows {
+                println!("{}", row?);
+            }
+        }
         Cmd::Index { embed } => {
             println!("{} files scanned, {} (re)indexed, {} removed", stats.scanned, stats.reindexed, stats.removed);
             if embed {
