@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .gateway import Gateway, UnknownProfile
+from .embed import Embedder, pack
 from .profiles import profiles_for
 
 HOST = "127.0.0.1"
@@ -25,6 +26,7 @@ LOG = Path.home() / ".cache" / "layatools" / "daemon.log"
 
 def make_handler(gateway: Gateway) -> type[BaseHTTPRequestHandler]:
     lock = threading.Lock()  # one forward pass at a time; the model is not thread-safe
+    embedder = Embedder()  # has its own lock, so embedding never waits on a Laya judgement
 
     class Handler(BaseHTTPRequestHandler):
         def _send(self, code: int, body: Any) -> None:
@@ -37,7 +39,7 @@ def make_handler(gateway: Gateway) -> type[BaseHTTPRequestHandler]:
 
         def do_GET(self) -> None:
             if self.path == "/health":
-                self._send(200, {"ok": True})
+                self._send(200, {"ok": True, "embed_model": embedder.model_name})
             elif self.path.startswith("/v1/decisions"):
                 cwd = self.path.partition("?cwd=")[2]
                 self._send(200, Gateway(gateway.backend, profiles_for(Path(cwd)) if cwd else gateway.profiles).list_decisions())
@@ -47,6 +49,9 @@ def make_handler(gateway: Gateway) -> type[BaseHTTPRequestHandler]:
         def do_POST(self) -> None:
             try:
                 req = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                if self.path == "/v1/embed":
+                    vecs = embedder.embed(req["texts"], query=bool(req.get("query")))
+                    return self._send(200, {"model": embedder.model_name, **pack(vecs)})
                 gw = Gateway(gateway.backend, profiles_for(Path(req["cwd"])) if req.get("cwd") else gateway.profiles)
                 with lock:
                     if self.path == "/v1/decide":

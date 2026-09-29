@@ -40,6 +40,11 @@ lt serve --port 8766                          # POST /v1/search {dir, question, 
 python eval/run_eval.py eval/mireglass.json <project_dir> -k 5   # top-k accuracy vs plain grep
 ```
 
+Semantic search: `lt index --embed` embeds chunks (BAAI/bge-small-en-v1.5 in the Python daemon, on GPU);
+afterwards `lt search` fuses keyword, name and embedding rankings automatically (new chunks are embedded on
+the fly; falls back to keyword-only if the daemon is down; `--lexical` forces that). Top-5 accuracy:
+MainLandingPage 12 -> 15/16, mireglass 14 -> 14/16 (grep: 4/16, 3/16).
+
 `--judge` re-ranks with Laya via the Python daemon (`layatools serve-http`); with the base model it
 does not improve results yet (see eval notes), so it is opt-in.
 Held-out eval (mireglass, 16 questions): right file in top 5 for 14/16 vs 3/16 for grep.

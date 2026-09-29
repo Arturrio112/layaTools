@@ -6,6 +6,7 @@ description = "Fast per-project code index and search for LLMs, with an optional
 
 [dependencies]
 anyhow = "1"
+base64 = "0.22"
 clap = { version = "4", features = ["derive"] }
 ignore = "0.4"
 regex = "1"

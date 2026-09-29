@@ -23,6 +23,9 @@ struct SearchReq {
     lines: usize,
     #[serde(default)]
     judge: bool,
+    /// Skip semantic ranking even when the project has embeddings.
+    #[serde(default)]
+    lexical: bool,
 }
 fn d_k() -> usize { 8 }
 fn d_one() -> usize { 1 }
@@ -75,7 +78,8 @@ fn run(indexes: &Indexes, r: SearchReq) -> Result<serde_json::Value> {
         }
         let idx = map.get_mut(&root).expect("just inserted");
         idx.sync()?;
-        search::search(idx, &r.question, if r.judge { r.k * 2 } else { r.k }, r.per_file, r.lines)?
+        let qvec = crate::query_vector(idx, &r.question, r.lexical);
+        search::search(idx, &r.question, if r.judge { r.k * 2 } else { r.k }, r.per_file, r.lines, qvec.as_deref())?
     };
     if r.judge && !hits.is_empty() {
         search::judge(&r.question, &mut hits)?;

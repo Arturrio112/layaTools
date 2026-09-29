@@ -42,6 +42,28 @@ fn fts_rows(index: &Index, expr: &str, limit: usize) -> Result<Vec<Row>> {
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
+/// Top chunks by cosine similarity to `q` (vectors are unit length, so a dot product). The
+/// returned score is the negated cosine, to sort like bm25 (lower is better).
+fn semantic_rows(index: &Index, q: &[f32], limit: usize) -> Result<Vec<Row>> {
+    let mut stmt = index.conn.prepare(
+        "SELECT v.file, v.start, c.end, c.text, v.vec FROM vecs v
+         JOIN chunks c ON c.file = v.file AND c.start = v.start",
+    )?;
+    let mut rows: Vec<Row> = stmt
+        .query_map([], |r| {
+            let blob: Vec<u8> = r.get(4)?;
+            let dot: f32 = blob.chunks_exact(4).zip(q).map(|(b, x)| f32::from_le_bytes([b[0], b[1], b[2], b[3]]) * x).sum();
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, -(dot as f64)))
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    rows.sort_by(|a, b| a.4.partial_cmp(&b.4).unwrap_or(std::cmp::Ordering::Equal));
+    rows.truncate(limit);
+    Ok(rows)
+}
+
+/// Weight of the semantic list relative to the whole-chunk keyword list.
+const SEM_WEIGHT: f64 = 1.0;
+
 /// Reciprocal-rank fusion constant: larger flattens the influence of the very top ranks.
 const RRF_K: f64 = 10.0;
 /// How much a file/symbol-name match counts relative to a whole-chunk match.
@@ -50,17 +72,31 @@ const NAME_WEIGHT: f64 = 0.7;
 /// Search the index. Two ranked lists are fused per file: one over everything (path, symbols, body)
 /// and one over only path and symbol names, so a file *called* what you asked about beats a file
 /// that merely mentions it.
-pub fn search(index: &Index, question: &str, k: usize, per_file: usize, snippet_lines: usize) -> Result<Vec<Hit>> {
+pub fn search(
+    index: &Index,
+    question: &str,
+    k: usize,
+    per_file: usize,
+    snippet_lines: usize,
+    qvec: Option<&[f32]>,
+) -> Result<Vec<Hit>> {
     let terms = query_terms(question);
-    if terms.is_empty() {
+    if terms.is_empty() && qvec.is_none() {
         return Ok(vec![]);
     }
     let expr = match_expr(&terms);
-    let all = fts_rows(index, &expr, k * per_file * 6)?;
-    let names = fts_rows(index, &format!("{{path symbols}} : ({expr})"), 60)?;
+    let (all, names) = if terms.is_empty() {
+        (vec![], vec![])
+    } else {
+        (fts_rows(index, &expr, k * per_file * 6)?, fts_rows(index, &format!("{{path symbols}} : ({expr})"), 60)?)
+    };
+    let sem = match qvec {
+        Some(q) => semantic_rows(index, q, k * per_file * 6)?,
+        None => vec![],
+    };
 
     let mut score: HashMap<&str, f64> = HashMap::new();
-    for (weight, rows) in [(1.0, &all), (NAME_WEIGHT, &names)] {
+    for (weight, rows) in [(1.0, &all), (NAME_WEIGHT, &names), (SEM_WEIGHT, &sem)] {
         let mut seen = std::collections::HashSet::new();
         for (rank, row) in rows.iter().filter(|r| seen.insert(r.0.as_str())).enumerate() {
             *score.entry(row.0.as_str()).or_insert(0.0) += weight / (RRF_K + rank as f64);
@@ -72,10 +108,17 @@ pub fn search(index: &Index, question: &str, k: usize, per_file: usize, snippet_
     let mut hits = Vec::new();
     for file in files.into_iter().take(k) {
         // Prefer the file's best whole-chunk matches; fall back to its best name match.
-        let mut chunks: Vec<&Row> = all.iter().filter(|r| r.0 == file).take(per_file).collect();
+        // The semantic best chunk leads (it is the one that answers the question), then keyword chunks.
+        let mut chunks: Vec<&Row> = sem.iter().find(|r| r.0 == file).into_iter().collect();
+        for r in all.iter().filter(|r| r.0 == file) {
+            if chunks.len() < per_file && !chunks.iter().any(|c| c.1 == r.1) {
+                chunks.push(r);
+            }
+        }
         if chunks.is_empty() {
             chunks.extend(names.iter().find(|r| r.0 == file));
         }
+        chunks.truncate(per_file);
         for (path, start, end, text, bm) in chunks {
             let snippet = best_snippet(text, &terms, snippet_lines, *start);
             hits.push(Hit { path: path.clone(), start: *start, end: *end, bm25: -bm, laya: None, snippet, text: text.clone() });

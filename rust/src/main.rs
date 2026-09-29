@@ -37,14 +37,40 @@ enum Cmd {
         judge: bool,
         #[arg(long)]
         json: bool,
+        /// Keyword-only: skip semantic ranking
+        #[arg(long)]
+        lexical: bool,
     },
     /// Re-sync the index and print stats
-    Index,
+    Index {
+        /// Also embed new chunks for semantic search (starts the embedding daemon)
+        #[arg(long)]
+        embed: bool,
+    },
     /// Serve searches over local HTTP (keeps indexes in memory)
     Serve {
         #[arg(long, default_value_t = 8766)]
         port: u16,
     },
+}
+
+/// Embed the query for semantic ranking, when the project has embeddings and the daemon is up.
+/// Chunks added since the last embed are embedded first so new files are searchable semantically.
+/// Any failure degrades to keyword-only search rather than failing the search.
+pub fn query_vector(idx: &mut index::Index, question: &str, lexical: bool) -> Option<Vec<f32>> {
+    if lexical || !idx.has_vectors() || !judge::healthy() {
+        return None;
+    }
+    if let Err(e) = idx.embed_missing() {
+        eprintln!("lt: embedding new chunks failed ({e}); using stale vectors");
+    }
+    match judge::embed(&[question.to_string()], true) {
+        Ok((_, mut v)) => v.pop(),
+        Err(e) => {
+            eprintln!("lt: semantic search unavailable ({e}); keyword-only");
+            None
+        }
+    }
 }
 
 fn main() -> Result<()> {
@@ -56,14 +82,17 @@ fn main() -> Result<()> {
     let stats = idx.sync()?;
     match cli.cmd {
         Cmd::Serve { .. } => unreachable!("handled above"),
-        Cmd::Index => println!(
-            "{} files scanned, {} (re)indexed, {} removed",
-            stats.scanned, stats.reindexed, stats.removed
-        ),
-        Cmd::Search { question, k, per_file, lines, judge, json } => {
+        Cmd::Index { embed } => {
+            println!("{} files scanned, {} (re)indexed, {} removed", stats.scanned, stats.reindexed, stats.removed);
+            if embed {
+                println!("{} chunks embedded", idx.embed_missing()?);
+            }
+        }
+        Cmd::Search { question, k, per_file, lines, judge, json, lexical } => {
             // Judge only helps if it can reorder something: fetch extra candidates first.
             let fetch = if judge { k * 2 } else { k };
-            let mut hits = search::search(&idx, &question, fetch, per_file, lines)?;
+            let qvec = query_vector(&mut idx, &question, lexical);
+            let mut hits = search::search(&idx, &question, fetch, per_file, lines, qvec.as_deref())?;
             if judge && !hits.is_empty() {
                 search::judge(&question, &mut hits)?;
                 hits.truncate(k);

@@ -50,6 +50,8 @@ impl Index {
         conn.execute_batch(
             "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;
              CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime_ns INTEGER, size INTEGER);
+             CREATE TABLE IF NOT EXISTS vecs(file TEXT, start INTEGER, vec BLOB, PRIMARY KEY(file, start));
+             CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
              CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(
                  path, symbols, body,
                  file UNINDEXED, start UNINDEXED, end UNINDEXED, text UNINDEXED,
@@ -97,6 +99,7 @@ impl Index {
             }
             let content = String::from_utf8_lossy(&bytes);
             tx.execute("DELETE FROM chunks WHERE file = ?1", params![rel])?;
+            tx.execute("DELETE FROM vecs WHERE file = ?1", params![rel])?;
             index_file(&tx, &rel, &content, &symbol_res)?;
             tx.execute(
                 "INSERT INTO files(path, mtime_ns, size) VALUES(?1, ?2, ?3)
@@ -108,11 +111,65 @@ impl Index {
         let mut removed = 0;
         for path in known.keys().filter(|p| !seen.contains(*p)) {
             tx.execute("DELETE FROM chunks WHERE file = ?1", params![path])?;
+            tx.execute("DELETE FROM vecs WHERE file = ?1", params![path])?;
             tx.execute("DELETE FROM files WHERE path = ?1", params![path])?;
             removed += 1;
         }
         tx.commit()?;
         Ok(SyncStats { scanned, reindexed, removed })
+    }
+
+    pub fn has_vectors(&self) -> bool {
+        self.conn.query_row("SELECT 1 FROM vecs LIMIT 1", [], |_| Ok(())).is_ok()
+    }
+
+    /// Embed every chunk that has no vector yet. Returns how many were embedded.
+    /// Clears all vectors first if the daemon's embedding model differs from the stored one.
+    pub fn embed_missing(&mut self) -> Result<usize> {
+        const BATCH: usize = 64;
+        let missing: Vec<(String, i64, String)> = {
+            let mut stmt = self.conn.prepare(
+                "SELECT c.file, c.start, c.text FROM chunks c
+                 LEFT JOIN vecs v ON v.file = c.file AND v.start = c.start WHERE v.file IS NULL",
+            )?;
+            let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+        if missing.is_empty() {
+            return Ok(0);
+        }
+        crate::judge::ensure_daemon()?;
+        let mut done = 0;
+        for batch in missing.chunks(BATCH) {
+            let texts: Vec<String> = batch.iter().map(|(_, _, t)| t.chars().take(2000).collect()).collect();
+            let (model, vecs) = crate::judge::embed(&texts, false)?;
+            let stored: Option<String> = self
+                .conn
+                .query_row("SELECT value FROM meta WHERE key='embed_model'", [], |r| r.get(0))
+                .ok();
+            if stored.as_deref() != Some(model.as_str()) {
+                self.conn.execute("DELETE FROM vecs", [])?;
+                self.conn.execute(
+                    "INSERT INTO meta(key, value) VALUES('embed_model', ?1)
+                     ON CONFLICT(key) DO UPDATE SET value=?1",
+                    params![model],
+                )?;
+                if stored.is_some() {
+                    return self.embed_missing(); // model changed: everything is missing now
+                }
+            }
+            let tx = self.conn.transaction()?;
+            for ((file, start, _), v) in batch.iter().zip(vecs) {
+                let blob: Vec<u8> = v.iter().flat_map(|f| f.to_le_bytes()).collect();
+                tx.execute(
+                    "INSERT OR REPLACE INTO vecs(file, start, vec) VALUES(?1, ?2, ?3)",
+                    params![file, start, blob],
+                )?;
+            }
+            tx.commit()?;
+            done += batch.len();
+        }
+        Ok(done)
     }
 }
 
