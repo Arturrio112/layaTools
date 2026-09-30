@@ -1,0 +1,1348 @@
+{
+ "questions": [
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "where is the contact form submission handled",
+   "expect": [
+    "src/scripts/contact-form.ts"
+   ],
+   "also": [
+    "src/components/ContactForm.astro"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "which component switches between Latvian and English",
+   "expect": [
+    "src/components/LocaleSwitch.astro"
+   ],
+   "also": [
+    "src/lib/i18n.ts"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "where are the English translations kept",
+   "expect": [
+    "src/i18n/en.json"
+   ],
+   "also": [
+    "src/lib/i18n.ts"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "where are the site pages and navigation structure defined",
+   "expect": [
+    "src/site/ia.ts"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "which test checks the mobile menu",
+   "expect": [
+    "e2e/factory/behaviors.spec.mjs"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "which test catches horizontal overflow on small screens",
+   "expect": [
+    "e2e/factory/overflow.spec.mjs"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "where is the Latvian price list page",
+   "expect": [
+    "src/pages/cenas.astro"
+   ],
+   "also": [
+    "src/views/Prices.astro"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "which check makes sure both languages have the same translation keys",
+   "expect": [
+    "e2e/factory/i18n-parity.mjs"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "where is the quality gate that runs all the checks",
+   "expect": [
+    "e2e/factory/gate.mjs"
+   ],
+   "also": [
+    "e2e/factory/gate.json"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "how is the built site served during the e2e tests",
+   "expect": [
+    "e2e/factory/serve.mjs"
+   ],
+   "also": [
+    "e2e/factory/playwright.config.mjs",
+    "e2e/factory/_site.mjs"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "where is the English privacy policy page",
+   "expect": [
+    "src/pages/en/privacy.astro"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "where do the global styles live",
+   "expect": [
+    "src/styles/global.css"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "what is the footer component",
+   "expect": [
+    "src/components/Footer.astro"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "which page is shown for unknown urls",
+   "expect": [
+    "src/pages/404.astro"
+   ],
+   "also": [
+    "src/pages/en/404.astro",
+    "src/views/NotFound.astro"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "dentist-lv",
+   "path": "sites/dentist-lv",
+   "q": "where are hreflang and canonical links emitted",
+   "expect": [
+    "src/layouts/Base.astro"
+   ],
+   "also": [
+    "e2e/factory/seo-site.spec.mjs"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where are login attempts rate limited",
+   "expect": [
+    "backend/routes/api.php"
+   ],
+   "also": [
+    "backend/tests/Feature/AuthThrottlingTest.php",
+    "backend/app/Http/Controllers/AuthController.php"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "which test covers login throttling",
+   "expect": [
+    "backend/tests/Feature/AuthThrottlingTest.php"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where is job description html sanitized",
+   "expect": [
+    "backend/app/Services/HtmlSanitizer.php"
+   ],
+   "also": [
+    "backend/app/Services/SanitizedDescription.php",
+    "frontend/lib/sanitize.ts",
+    "frontend/components/SafeHtmlRenderer.tsx"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "how are job listings ranked",
+   "expect": [
+    "backend/app/Services/JobRanker.php"
+   ],
+   "also": [
+    "backend/config/ranking.php",
+    "backend/app/Console/Commands/RecomputeJobRanking.php"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "what scheduled command expires old jobs",
+   "expect": [
+    "backend/app/Console/Commands/ExpireJobs.php"
+   ],
+   "also": [
+    "backend/routes/console.php"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where is the import of jobs from the state employment agency implemented",
+   "expect": [
+    "backend/app/Services/Nva/NvaSync.php"
+   ],
+   "also": [
+    "backend/app/Console/Commands/SyncNvaListings.php",
+    "backend/app/Services/Nva/NvaClient.php"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "which test checks imported jobs are closed safely when they disappear at the source",
+   "expect": [
+    "backend/tests/Feature/NvaSyncClosingTest.php"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where is schema.org JobPosting structured data generated",
+   "expect": [
+    "frontend/lib/job-posting-schema.ts"
+   ],
+   "also": [
+    "frontend/app/jobs/[id]/page.tsx"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where is the kanban hiring pipeline board",
+   "expect": [
+    "frontend/components/PipelineBoard.tsx"
+   ],
+   "also": [
+    "frontend/components/PipelineColumn.tsx"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "how is a candidate cv download restricted to the employer",
+   "expect": [
+    "backend/app/Http/Controllers/EmployerApplicationController.php"
+   ],
+   "also": [
+    "frontend/app/api/cv/[applicationId]/route.ts",
+    "backend/tests/Feature/CvPrivacyTest.php",
+    "backend/app/Policies/JobApplicationPolicy.php"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "how does the frontend redirect logged out visitors away from dashboards",
+   "expect": [
+    "frontend/proxy.ts"
+   ],
+   "also": [
+    "frontend/app/dashboard/employer/layout.tsx",
+    "frontend/app/dashboard/seeker/layout.tsx"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where is the newsletter subscription api",
+   "expect": [
+    "backend/app/Http/Controllers/SubscriberController.php"
+   ],
+   "also": [
+    "backend/app/Http/Requests/StoreSubscriberRequest.php",
+    "frontend/actions/subscribe.ts",
+    "frontend/components/NewsletterSignup.tsx"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where are the Latvian translations",
+   "expect": [
+    "frontend/locales/lv.json"
+   ],
+   "also": [
+    "frontend/lib/i18n.ts"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "how do I run the backend tests in docker",
+   "expect": [
+    "backend/docker/run-tests.sh"
+   ],
+   "also": [
+    "Makefile",
+    "docker-compose.yml",
+    "backend/README.md",
+    "README.md"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "which e2e test covers a new employer posting their first job",
+   "expect": [
+    "e2e/tests/employer-new.spec.ts"
+   ],
+   "also": [
+    "e2e/helpers/employer.ts"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "how does an employer redeem a coupon",
+   "expect": [
+    "backend/app/Http/Controllers/CouponController.php"
+   ],
+   "also": [
+    "backend/app/Models/Coupon.php",
+    "frontend/actions/coupon.ts"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where is the salary range form field",
+   "expect": [
+    "frontend/components/SalaryRangeFields.tsx"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "what deletes old job applications for data retention",
+   "expect": [
+    "backend/app/Console/Commands/PruneApplications.php"
+   ],
+   "also": [
+    "backend/tests/Feature/RetentionTest.php"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "which controller lets an admin moderate jobs",
+   "expect": [
+    "backend/app/Http/Controllers/Admin/JobController.php"
+   ],
+   "also": [
+    "backend/tests/Feature/AdminJobModerationTest.php"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where are the api routes declared",
+   "expect": [
+    "backend/routes/api.php"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where is the domain vocabulary documented",
+   "expect": [
+    "docs/agents/domain.md"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "how is text extracted from an uploaded document to prefill the job description",
+   "expect": [
+    "frontend/app/api/extract-text/route.ts"
+   ],
+   "also": [
+    "frontend/components/DescriptionImport.tsx"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where is the job search filter ui",
+   "expect": [
+    "frontend/components/JobFilters.tsx"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where is the password reset flow",
+   "expect": [
+    "backend/app/Http/Controllers/PasswordResetController.php"
+   ],
+   "also": [
+    "frontend/actions/password.ts",
+    "frontend/components/ResetPasswordForm.tsx",
+    "frontend/components/ForgotPasswordForm.tsx"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "jobBoard",
+   "path": "projects/jobBoard",
+   "q": "where is the sitemap generated",
+   "expect": [
+    "frontend/app/sitemap.ts"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where are hreflang alternates and sitemap configured",
+   "expect": [
+    "astro.config.mjs"
+   ],
+   "also": [
+    "src/layouts/BaseLayout.astro",
+    "src/i18n/slugs.ts"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where is the cookie consent banner",
+   "expect": [
+    "src/components/CookieConsent.astro"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where are the translated url slugs for each language",
+   "expect": [
+    "src/i18n/slugs.ts"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where are the ui text translations",
+   "expect": [
+    "src/i18n/ui.ts"
+   ],
+   "also": [
+    "src/i18n/utils.ts"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where is the frequently asked questions content",
+   "expect": [
+    "src/lib/faq-data.ts"
+   ],
+   "also": [
+    "src/components/pages/FaqHub.astro",
+    "src/components/blocks/Faq.astro"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where is the glossary page",
+   "expect": [
+    "src/components/pages/Glossary.astro"
+   ],
+   "also": [
+    "src/lib/glossary-data.ts",
+    "src/pages/terminu-vardnica.astro"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where is json-ld structured data for a service page",
+   "expect": [
+    "src/components/ServiceSchema.astro"
+   ],
+   "also": [
+    "src/components/StructuredData.astro"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "what implements the mobile navigation menu",
+   "expect": [
+    "src/components/MobileMenu.astro"
+   ],
+   "also": [
+    "src/components/Header.astro"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where is the language picker",
+   "expect": [
+    "src/components/LanguagePicker.astro"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "how is the site deployed to cloudflare",
+   "expect": [
+    "wrangler.jsonc"
+   ],
+   "also": [
+    "README.md"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where is the llms.txt file for ai crawlers",
+   "expect": [
+    "public/llms.txt"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where is the case study content stored",
+   "expect": [
+    "src/lib/case-studies-data.ts"
+   ],
+   "also": [
+    "src/components/CaseStudyDetail.astro"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where are the russian service pages",
+   "expect": [
+    "src/pages/ru/uslugi/[slug].astro"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where do the project conventions for coding agents live",
+   "expect": [
+    "agents.md"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where is https forced on the apache server",
+   "expect": [
+    "public/.htaccess"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where is the customer reviews section of the homepage",
+   "expect": [
+    "src/components/blocks/Reviews.astro"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "ventmernieks",
+   "path": "projects/ventmernieks",
+   "q": "where are the icons for services defined",
+   "expect": [
+    "src/lib/service-icons.ts"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "Brutes",
+   "path": "projects/ClientDemos/Brutes",
+   "q": "where is the cookie consent banner",
+   "expect": [
+    "src/components/CookieConsent.astro"
+   ],
+   "also": [
+    "src/components/pages/CookiePolicyPage.astro"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "Brutes",
+   "path": "projects/ClientDemos/Brutes",
+   "q": "where are the route names for each language defined",
+   "expect": [
+    "src/i18n/routes.ts"
+   ],
+   "also": [
+    "src/pages/[locale]/[...slug].astro"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "Brutes",
+   "path": "projects/ClientDemos/Brutes",
+   "q": "where is the photo gallery component",
+   "expect": [
+    "src/components/BentoGallery.astro"
+   ],
+   "also": [
+    "src/content/photos.ts",
+    "src/components/pages/GalleryPage.astro"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "Brutes",
+   "path": "projects/ClientDemos/Brutes",
+   "q": "where is the sauna page",
+   "expect": [
+    "src/components/pages/SaunaPage.astro"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "Brutes",
+   "path": "projects/ClientDemos/Brutes",
+   "q": "how is the site configured for cloudflare workers",
+   "expect": [
+    "wrangler.jsonc"
+   ],
+   "also": [
+    "astro.config.mjs"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "Brutes",
+   "path": "projects/ClientDemos/Brutes",
+   "q": "where are the redirects",
+   "expect": [
+    "public/_redirects"
+   ],
+   "also": [
+    "src/pages/index.astro"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "Brutes",
+   "path": "projects/ClientDemos/Brutes",
+   "q": "where are meta tags and the html head defined",
+   "expect": [
+    "src/layouts/BaseLayout.astro"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "Brutes",
+   "path": "projects/ClientDemos/Brutes",
+   "q": "where is the Latvian copy",
+   "expect": [
+    "src/i18n/lv.ts"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "Brutes",
+   "path": "projects/ClientDemos/Brutes",
+   "q": "what generates robots.txt",
+   "expect": [
+    "src/pages/robots.txt.ts"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "Brutes",
+   "path": "projects/ClientDemos/Brutes",
+   "q": "where are the project instructions for the coding agent",
+   "expect": [
+    "CLAUDE.md"
+   ],
+   "also": [
+    "README.md"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "Brutes",
+   "path": "projects/ClientDemos/Brutes",
+   "q": "where is the parallax band component",
+   "expect": [
+    "src/components/ParallaxBand.astro"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "Brutes",
+   "path": "projects/ClientDemos/Brutes",
+   "q": "where are the statistics numbers shown",
+   "expect": [
+    "src/components/Stats.astro"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "onboard-test-1",
+   "path": "projects/onboard-test-1",
+   "q": "where is a single blog post rendered",
+   "expect": [
+    "src/pages/posts/[slug].astro"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "onboard-test-1",
+   "path": "projects/onboard-test-1",
+   "q": "how is the sitemap generated",
+   "expect": [
+    "src/pages/sitemap.xml.ts"
+   ],
+   "also": [
+    "astro.config.mjs"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "onboard-test-1",
+   "path": "projects/onboard-test-1",
+   "q": "where is the site title and main config",
+   "expect": [
+    "src/data/config.ts"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "onboard-test-1",
+   "path": "projects/onboard-test-1",
+   "q": "where are the theme colours defined",
+   "expect": [
+    "src/data/theme.ts"
+   ],
+   "also": [
+    "tailwind.config.cjs"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "onboard-test-1",
+   "path": "projects/onboard-test-1",
+   "q": "where are the seo meta tags built",
+   "expect": [
+    "src/components/seo/SEOTags.astro"
+   ],
+   "also": [
+    "src/layouts/Layout.astro"
+   ],
+   "split": "test"
+  },
+  {
+   "project": "onboard-test-1",
+   "path": "projects/onboard-test-1",
+   "q": "where is the list of portfolio projects",
+   "expect": [
+    "src/data/projects.ts"
+   ],
+   "also": [
+    "src/components/ProjectCard.astro"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "onboard-test-1",
+   "path": "projects/onboard-test-1",
+   "q": "where are dates formatted",
+   "expect": [
+    "src/utils/formatDate.ts"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "onboard-test-1",
+   "path": "projects/onboard-test-1",
+   "q": "where is the blog content collection schema",
+   "expect": [
+    "src/content/config.ts"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "onboard-test-1",
+   "path": "projects/onboard-test-1",
+   "q": "what does continuous integration run",
+   "expect": [
+    ".github/workflows/ci-check.yaml"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "onboard-test-1",
+   "path": "projects/onboard-test-1",
+   "q": "where are the social media links",
+   "expect": [
+    "src/components/SocialLinks.astro"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "onboard-test-1",
+   "path": "projects/onboard-test-1",
+   "q": "which component shows a post preview card",
+   "expect": [
+    "src/components/PostCard.astro"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "emailer",
+   "path": "projects/emailer",
+   "q": "where is the jwt token verified",
+   "expect": [
+    "src/middlewares/auth.middleware.js"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "emailer",
+   "path": "projects/emailer",
+   "q": "how do I generate an api token for a client",
+   "expect": [
+    "scripts/generateToken.js"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "emailer",
+   "path": "projects/emailer",
+   "q": "where is rate limiting configured",
+   "expect": [
+    "src/versions/v1/index.js"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "emailer",
+   "path": "projects/emailer",
+   "q": "where is the send email endpoint implemented",
+   "expect": [
+    "src/versions/v1/services/email/email.controller.js"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "emailer",
+   "path": "projects/emailer",
+   "q": "where is the openapi request schema",
+   "expect": [
+    "src/versions/v1/services/email/email.schema.yaml"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "emailer",
+   "path": "projects/emailer",
+   "q": "where are cors allowed origins set",
+   "expect": [
+    "src/app.js"
+   ],
+   "also": [
+    ".env.example"
+   ],
+   "split": "dev"
+  },
+  {
+   "project": "javaBootCamp",
+   "path": "projects/javaBootCamp",
+   "q": "which class converts inches to centimeters",
+   "expect": [
+    "KeywordsAndExpressions/src/ChallangeTwo.java"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "javaBootCamp",
+   "path": "projects/javaBootCamp",
+   "q": "where is the nato phonetic alphabet",
+   "expect": [
+    "KeywordsAndExpressions/src/ChallangeTwo.java"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "javaBootCamp",
+   "path": "projects/javaBootCamp",
+   "q": "where is the high score position calculated",
+   "expect": [
+    "KeywordsAndExpressions/src/MainChallenge.java"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "javaBootCamp",
+   "path": "projects/javaBootCamp",
+   "q": "which class formats a duration from seconds and minutes",
+   "expect": [
+    "KeywordsAndExpressions/src/ChallengeThree.java"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "javaBootCamp",
+   "path": "projects/javaBootCamp",
+   "q": "which code prints years and days from minutes",
+   "expect": [
+    "KeywordsAndExpressions/src/ChallengeThree.java"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "where is the list of active locales defined",
+   "expect": [
+    "src/routes.js"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "why does each locale get its own i18next instance",
+   "expect": [
+    "src/i18n.js"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "how are static html pages generated at build time",
+   "expect": [
+    "scripts/prerender.mjs"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "which file renders the react app to a string for the server",
+   "expect": [
+    "src/entry-server.jsx"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "where does client hydration happen",
+   "expect": [
+    "src/entry-client.jsx"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "where are canonical tags and hreflang generated",
+   "expect": [
+    "src/seo/headTags.js"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "how is the sitemap built",
+   "expect": [
+    "scripts/sitemap-plugin.mjs"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "which component lets users switch language",
+   "expect": [
+    "src/components/LanguageSwitcher.jsx"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "where is the router configured",
+   "expect": [
+    "src/App.jsx"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "why is Russian not live yet and where is its copy",
+   "expect": [
+    "src/locales/ru.json",
+    "src/routes.js"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "how is the site served in production without a spa rewrite",
+   "expect": [
+    "firebase.json"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "how do I preview the built site locally",
+   "expect": [
+    "scripts/serve-static.mjs"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "what are the service keys for the four things the studio sells",
+   "expect": [
+    "src/routes.js"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "what happens when a route redirects during server render",
+   "expect": [
+    "src/entry-server.jsx"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "where do route paths for each locale come from",
+   "expect": [
+    "src/routes.js"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "MainLandingPage",
+   "path": "projects/MainLandingPage",
+   "q": "where are the coding rules for contributors",
+   "expect": [
+    "AGENTS.md"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "where is the newsletter signup page",
+   "expect": [
+    "src/pages/newsletter.astro"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "which layout wraps every page",
+   "expect": [
+    "src/layouts/Base.astro"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "how is the contact form submitted",
+   "expect": [
+    "src/scripts/contact-form.ts"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "where is the astro build configured",
+   "expect": [
+    "astro.config.mjs"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "where is the 404 page",
+   "expect": [
+    "src/pages/404.astro"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "which check verifies colour contrast",
+   "expect": [
+    "e2e/factory/contrast.spec.mjs"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "which test checks prefers-reduced-motion behaviour",
+   "expect": [
+    "e2e/factory/reduced-motion.spec.mjs"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "which test makes sure tap targets are big enough",
+   "expect": [
+    "e2e/factory/tap-targets.spec.mjs"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "where is the sitemap and canonical link check",
+   "expect": [
+    "e2e/factory/seo-site.spec.mjs",
+    "e2e/factory/seo-meta.mjs"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "which test finds placeholder legal text on the privacy page",
+   "expect": [
+    "e2e/factory/legal-complete.spec.mjs"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "where is the visual regression test",
+   "expect": [
+    "e2e/factory/visual.spec.mjs"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "which check makes sure keyboard focus is visible",
+   "expect": [
+    "e2e/factory/focus-visible.spec.mjs"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "where is the press fact sheet page",
+   "expect": [
+    "src/pages/press.astro"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "how is the built site served locally for the tests",
+   "expect": [
+    "e2e/factory/serve.mjs"
+   ],
+   "also": [],
+   "split": "dev"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "which test checks the mobile menu and other behaviours",
+   "expect": [
+    "e2e/factory/behaviors.spec.mjs"
+   ],
+   "also": [],
+   "split": "test"
+  },
+  {
+   "project": "mireglass",
+   "path": "sites/mireglass",
+   "q": "where is the description of what the game world is about",
+   "expect": [
+    "src/pages/world.astro"
+   ],
+   "also": [],
+   "split": "dev"
+  }
+ ]
+}

@@ -61,6 +61,11 @@ fn semantic_rows(index: &Index, q: &[f32], limit: usize) -> Result<Vec<Row>> {
     Ok(rows)
 }
 
+/// Tuning knob read from the environment (`LT_<NAME>`), used by the eval sweeps; defaults apply otherwise.
+fn knob(name: &str, default: f64) -> f64 {
+    std::env::var(format!("LT_{name}")).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
+}
+
 /// Weight of the Laya judge relative to the retrieval order when fusing.
 const JUDGE_WEIGHT: f64 = 1.0;
 
@@ -99,10 +104,11 @@ pub fn search(
     };
 
     let mut score: HashMap<&str, f64> = HashMap::new();
-    for (weight, rows) in [(1.0, &all), (NAME_WEIGHT, &names), (SEM_WEIGHT, &sem)] {
+    let (rrf_k, name_w, sem_w) = (knob("RRF_K", RRF_K), knob("NAME_WEIGHT", NAME_WEIGHT), knob("SEM_WEIGHT", SEM_WEIGHT));
+    for (weight, rows) in [(1.0, &all), (name_w, &names), (sem_w, &sem)] {
         let mut seen = std::collections::HashSet::new();
         for (rank, row) in rows.iter().filter(|r| seen.insert(r.0.as_str())).enumerate() {
-            *score.entry(row.0.as_str()).or_insert(0.0) += weight / (RRF_K + rank as f64);
+            *score.entry(row.0.as_str()).or_insert(0.0) += weight / (rrf_k + rank as f64);
         }
     }
     let mut files: Vec<&str> = score.keys().copied().collect();
@@ -177,8 +183,9 @@ pub fn judge(question: &str, hits: &mut Vec<Hit>) -> Result<()> {
     for (rank, &i) in by_judge.iter().enumerate() {
         judge_rank[i] = rank;
     }
+    let (rrf_k, judge_w) = (knob("RRF_K", RRF_K), knob("JUDGE_WEIGHT", JUDGE_WEIGHT));
     let fused: Vec<f64> =
-        (0..hits.len()).map(|i| 1.0 / (RRF_K + i as f64) + JUDGE_WEIGHT / (RRF_K + judge_rank[i] as f64)).collect();
+        (0..hits.len()).map(|i| 1.0 / (rrf_k + i as f64) + judge_w / (rrf_k + judge_rank[i] as f64)).collect();
     let mut order: Vec<usize> = (0..hits.len()).collect();
     order.sort_by(|&a, &b| fused[b].partial_cmp(&fused[a]).unwrap_or(std::cmp::Ordering::Equal));
     let sorted: Vec<Hit> = order.into_iter().map(|i| hits[i].clone()).collect();

@@ -10,3 +10,18 @@ wheels/
 .venv
 rust/target/
 train/out/
+
+# Tool caches and editor state (not needed to build or run)
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.idea/
+.vscode/
+.claude/
+.DS_Store
+
+# Local eval/training output
+eval/out/
+train/out/
+*.log
+.env

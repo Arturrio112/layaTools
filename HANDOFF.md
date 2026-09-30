@@ -1,6 +1,6 @@
 # layaTools handoff
 
-Written at the end of session 1 (2026-09-29). Read this fully before doing anything. Last commit: `920e47b`.
+Written at the end of session 1 (2026-09-29), updated in session 2 (2026-09-30, the bigger eval; see below). Read this fully before doing anything.
 
 ## What this project is
 
@@ -43,7 +43,18 @@ two real projects it is roughly neutral. Likely reasons: retrieval already puts 
 ~14/16 so there is little to fix; single-expected-file ground truth counts a legitimately relevant doc
 (e.g. `CONTEXT.md`) as a miss; 16 questions per project is far too few to see a 1-question change.
 
-## The next task: a bigger, fairer real evaluation
+## Session 2: bigger real evaluation (done)
+
+`eval/real.json` (123 questions, 9 projects, dev 69 / test 54, multiple acceptable files) + `eval/run_real.py`;
+questions were written by Claude directly (no subagents), before running `lt` on them. Results and the
+honest reading are in the README ("Evaluation"). Summary: `lt` top-5 ~87-93% (hybrid) vs grep ~32-43%; hybrid > lexical on
+dev (17 vs 5 better) but a wash on test (7 vs 5 for lexical); judge +16/-8 ranks (p~0.15), not significant, ~300 ms
+vs ~24 ms, stays opt-in. Fusion weights (JUDGE_WEIGHT, RRF_K, SEM_WEIGHT, NAME_WEIGHT; now env-overridable as
+`LT_*`) were swept on dev and were already at the optimum/plateau. Judge weight 0.5 vs 1.0 is within noise.
+Caveats: questions are by one author (me), so phrasing is biased toward file names; several projects are
+small (3-5 test questions); MainLandingPage is dev-only. Not done: end-to-end token savings for a Claude Code task.
+
+## The (original) next-task plan, kept for reference
 
 Goal: decide whether the judge (and the retrieval fusion weights) genuinely help, and whether `lt` is good
 enough to roll out across `~/factory`'s workflow. Suggested plan:

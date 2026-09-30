@@ -37,13 +37,13 @@ answers "where is X?" with `path:lines` plus a snippet, so an LLM reads hits ins
 cargo install --path rust --root ~/.local     # installs `lt`
 lt search "where is the router configured" -k 5 [--per-file 2] [--json] [-C <dir>]
 lt serve --port 8766                          # POST /v1/search {dir, question, k, ...} on loopback
-python eval/run_eval.py eval/mireglass.json <project_dir> -k 5   # top-k accuracy vs plain grep
+python3 eval/run_real.py --split test --per-project             # multi-project eval, see "Evaluation"
 ```
 
 Semantic search: `lt index --embed` embeds chunks (BAAI/bge-small-en-v1.5 in the Python daemon, on GPU);
 afterwards `lt search` fuses keyword, name and embedding rankings automatically (new chunks are embedded on
 the fly; falls back to keyword-only if the daemon is down; `--lexical` forces that). Top-5 accuracy:
-MainLandingPage 12 -> 15/16, mireglass 14 -> 14/16 (grep: 4/16, 3/16).
+see "Evaluation" below.
 
 `--judge` re-ranks the top candidates with a fine-tuned Laya relevance judge (via the Python daemon,
 `layatools serve-http`), fused with the retrieval order. Opt-in. See "Fine-tuning" below.
@@ -62,6 +62,34 @@ cp -r train/out/laya-code-relevance-v2 ~/.local/share/layatools/models/laya-code
 ```
 
 Held-out repos (240 questions, ~5 candidates each): base Laya top-1 0.48 / MRR 0.67 -> tuned 0.86 / 0.93.
-On the two real eval projects the judge is roughly neutral (top-1 9/16 both, with or without it), so it
-is not on by default.
-Held-out eval (mireglass, 16 questions): right file in top 5 for 14/16 vs 3/16 for grep.
+On the real-project eval below the judge helps only slightly and not significantly, so it stays opt-in.
+
+## Evaluation (`eval/`)
+
+`eval/real.json` (built by `eval/build_real.py`) has 123 questions over 9 real projects in `~/sites` and
+`~/projects` (Astro, React/Vite, Laravel + Next.js, Express, Java). Each question lists acceptable files
+(`expect` + `also`), and is split into dev (69) and test (54); `MainLandingPage` is dev-only because the
+keyword rules were tuned on it. Weights were swept on dev only, then test was run once. The near-duplicate
+`dentist-lv.old` and `MainLandingPage-backup` are excluded. `lt` weights can be overridden for sweeps with
+`LT_JUDGE_WEIGHT`, `LT_RRF_K`, `LT_SEM_WEIGHT`, `LT_NAME_WEIGHT`.
+
+```bash
+python3 eval/run_real.py --split test --per-project [--misses] [--modes grep,lexical,hybrid,judge] [--env LT_JUDGE_WEIGHT=0.5]
+```
+
+Held-out test half, k=5 (n=54; MRR over the top 5):
+
+| mode | top-1 | top-3 | top-5 | MRR | tokens/answer | latency |
+|---|---|---|---|---|---|---|
+| grep | 6 | 15 | 23 | 0.22 | ~35 | - |
+| lexical | 36 | 48 | 48 | 0.765 | ~270 | 9 ms |
+| hybrid (default) | 38 | 46 | 47 | 0.776 | ~275 | 24 ms |
+| hybrid + judge | 38 | 46 | 50 | 0.792 | ~290 | 300 ms |
+
+Dev half (n=69): hybrid 47/60/64 (MRR 0.78) vs lexical 42/55/59 (0.70); judge 50/62/63 (0.80).
+Honest reading: `lt` finds an acceptable file in the top 5 for ~87-93% of questions (hybrid) vs ~32-43% for
+grep. Hybrid beats lexical clearly on dev (better rank on 17 questions, worse on 5) but not on test (7 vs 5 in
+lexical's favour), so the embedding gain is real on some projects but not proven overall. The judge
+improved the rank on 16 questions and worsened it on 8 across dev+test (sign test p~0.15): a small positive
+trend that is not statistically significant, at ~12x the latency. The current fusion weights were already at
+the optimum or on a flat plateau on dev, so none were changed.
