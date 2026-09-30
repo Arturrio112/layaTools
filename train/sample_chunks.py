@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VAL_REPOS = {"cobra", "commander.js"}  # never trained on; used to validate the judge
+VAL_REPOS = {"cobra", "commander.js", "polka", "realworld"}  # never trained on; used to validate the judge
 SKIP = re.compile(r"(^|/)(dist|build|vendor|node_modules|\.github|docs?/_build)/|\.(lock|snap)$|CHANGELOG|LICENSE", re.I)
 
 

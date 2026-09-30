@@ -54,6 +54,14 @@ vs ~24 ms, stays opt-in. Fusion weights (JUDGE_WEIGHT, RRF_K, SEM_WEIGHT, NAME_W
 Caveats: questions are by one author (me), so phrasing is biased toward file names; several projects are
 small (3-5 test questions); MainLandingPage is dev-only. Not done: end-to-end token savings for a Claude Code task.
 
+### Session 2b: judge v3 retrain (done)
+Training data `~/.local/share/layatools/train_data_web/` (chunks, questions, `cases_web.jsonl`), merged cases
+`train_data/cases3.jsonl`, log `train_v3.log`, OSS clones in `~/.local/share/layatools/oss_web/`. Active model
+`models/laya-code-relevance` = v3 (v2 kept as `laya-code-relevance-v2`). On the real eval the judge now beats
+hybrid on 16 questions and loses on 3 (p~0.004; test MRR 0.776 -> 0.811). Still opt-in (~300 ms). Next: try
+`lt search --judge` as default for the skill, measure end-to-end token savings, more real-style training data.
+Caveat: test split was also used to compare v2 vs v3 (2 looks); dev shows the same direction.
+
 ## The (original) next-task plan, kept for reference
 
 Goal: decide whether the judge (and the retrieval fusion weights) genuinely help, and whether `lt` is good

@@ -17,7 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VAL_REPOS = {"cobra", "commander.js"}
+VAL_REPOS = {"cobra", "commander.js", "polka", "realworld"}
 CONTENT_CHARS = 1500  # must match what `lt search --judge` sends to the judge
 HARD_NEGATIVES = 3
 
@@ -60,10 +60,16 @@ def main() -> None:
                                   "content": f"file: {path}\n{content[:CONTENT_CHARS]}", "p_true": p, "levels": levels})
 
                 add("positive", src["file"], src["text"])
+                # Optional extra acceptable files (first chunk of each): more than one right answer.
+                also = [f for f in row.get("also_files", []) if f != src["file"]][:2]
+                for f in also:
+                    first = next((c for c in all_chunks if c["file"] == f), None)
+                    if first:
+                        add("positive", first["file"], first["text"])
                 hits = json.loads(subprocess.run(
-                    ["lt", "-C", str(oss / repo), "search", q, "-k", "10", "--lexical", "--json"],
+                    ["lt", "-C", str(oss / repo), "search", "-k", "10", "--lexical", "--json", "--", q],
                     capture_output=True, text=True, check=True).stdout or "[]")
-                negs = [h for h in hits if h["path"] != src["file"]][:HARD_NEGATIVES]
+                negs = [h for h in hits if h["path"] != src["file"] and h["path"] not in also][:HARD_NEGATIVES]
                 for h in negs:
                     text = text_of.get((h["path"], h["start"]))
                     if text:
