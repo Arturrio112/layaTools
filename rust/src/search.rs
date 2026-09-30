@@ -45,20 +45,18 @@ fn fts_rows(index: &Index, expr: &str, limit: usize) -> Result<Vec<Row>> {
 /// Top chunks by cosine similarity to `q` (vectors are unit length, so a dot product). The
 /// returned score is the negated cosine, to sort like bm25 (lower is better).
 fn semantic_rows(index: &Index, q: &[f32], limit: usize) -> Result<Vec<Row>> {
-    let mut stmt = index.conn.prepare(
-        "SELECT v.file, v.start, c.end, c.text, v.vec FROM vecs v
-         JOIN chunks c ON c.file = v.file AND c.start = v.start",
-    )?;
-    let mut rows: Vec<Row> = stmt
-        .query_map([], |r| {
-            let blob: Vec<u8> = r.get(4)?;
-            let dot: f32 = blob.chunks_exact(4).zip(q).map(|(b, x)| f32::from_le_bytes([b[0], b[1], b[2], b[3]]) * x).sum();
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, -(dot as f64)))
-        })?
-        .collect::<rusqlite::Result<_>>()?;
-    rows.sort_by(|a, b| a.4.partial_cmp(&b.4).unwrap_or(std::cmp::Ordering::Equal));
-    rows.truncate(limit);
-    Ok(rows)
+    let vecs = index.vectors()?;
+    let mut scored: Vec<(usize, f32)> =
+        vecs.iter().enumerate().map(|(i, c)| (i, c.4.iter().zip(q).map(|(a, b)| a * b).sum())).collect();
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    scored.truncate(limit);
+    scored
+        .into_iter()
+        .map(|(i, dot)| {
+            let (rowid, file, start, end, _) = &vecs[i];
+            Ok((file.clone(), *start, *end, index.chunk_text(*rowid)?, -(dot as f64)))
+        })
+        .collect()
 }
 
 /// Tuning knob read from the environment (`LT_<NAME>`), used by the eval sweeps; defaults apply otherwise.
@@ -164,7 +162,7 @@ pub fn judge(question: &str, hits: &mut Vec<Hit>) -> Result<()> {
             (format!("{}:{}-{}", h.path, h.start, h.end), format!("file: {}\n{}", h.path, body))
         })
         .collect();
-    let ranked: Vec<serde_json::Value> = ureq::post(&format!("{}/v1/rank", crate::judge::URL))
+    let ranked: Vec<serde_json::Value> = ureq::post(&format!("{}/v1/rank", crate::judge::url()))
         .timeout(std::time::Duration::from_secs(120))
         .send_json(serde_json::json!({"task": question, "items": items}))?
         .into_json()?;
@@ -175,20 +173,116 @@ pub fn judge(question: &str, hits: &mut Vec<Hit>) -> Result<()> {
     for h in hits.iter_mut() {
         h.laya = scores.get(&format!("{}:{}-{}", h.path, h.start, h.end)).copied();
     }
-    // Fuse rather than replace: keep the retrieval order (name + keyword + semantic signals the
-    // judge cannot see) and blend in the judge's order by reciprocal rank.
-    let mut by_judge: Vec<usize> = (0..hits.len()).collect();
-    by_judge.sort_by(|&a, &b| hits[b].laya.partial_cmp(&hits[a].laya).unwrap_or(std::cmp::Ordering::Equal));
-    let mut judge_rank = vec![0usize; hits.len()];
-    for (rank, &i) in by_judge.iter().enumerate() {
-        judge_rank[i] = rank;
-    }
-    let (rrf_k, judge_w) = (knob("RRF_K", RRF_K), knob("JUDGE_WEIGHT", JUDGE_WEIGHT));
-    let fused: Vec<f64> =
-        (0..hits.len()).map(|i| 1.0 / (rrf_k + i as f64) + judge_w / (rrf_k + judge_rank[i] as f64)).collect();
-    let mut order: Vec<usize> = (0..hits.len()).collect();
-    order.sort_by(|&a, &b| fused[b].partial_cmp(&fused[a]).unwrap_or(std::cmp::Ordering::Equal));
+    let laya: Vec<Option<f64>> = hits.iter().map(|h| h.laya).collect();
+    let order = fuse_judge(&laya, knob("RRF_K", RRF_K), knob("JUDGE_WEIGHT", JUDGE_WEIGHT));
     let sorted: Vec<Hit> = order.into_iter().map(|i| hits[i].clone()).collect();
     *hits = sorted;
     Ok(())
+}
+
+/// Fuse rather than replace: keep the retrieval order (name + keyword + semantic signals the judge
+/// cannot see) and blend in the judge's order by reciprocal rank. `laya[i]` is the judge score of
+/// the hit at retrieval rank `i` (None = not scored, ranked last by the judge). Returns the new
+/// order as retrieval indices; ties keep the retrieval order.
+pub fn fuse_judge(laya: &[Option<f64>], rrf_k: f64, judge_w: f64) -> Vec<usize> {
+    let n = laya.len();
+    let mut by_judge: Vec<usize> = (0..n).collect();
+    by_judge.sort_by(|&a, &b| laya[b].partial_cmp(&laya[a]).unwrap_or(std::cmp::Ordering::Equal));
+    let mut judge_rank = vec![0usize; n];
+    for (rank, &i) in by_judge.iter().enumerate() {
+        judge_rank[i] = rank;
+    }
+    let fused: Vec<f64> = (0..n).map(|i| 1.0 / (rrf_k + i as f64) + judge_w / (rrf_k + judge_rank[i] as f64)).collect();
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by(|&a, &b| fused[b].partial_cmp(&fused[a]).unwrap_or(std::cmp::Ordering::Equal));
+    order
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::params;
+    use std::fs;
+
+    /// A throwaway project plus its index (kept outside the project, like the real cache).
+    fn project(files: &[(&str, &str)]) -> (tempfile::TempDir, tempfile::TempDir, Index) {
+        let (dir, cache) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+        for (path, body) in files {
+            let p = dir.path().join(path);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(p, body).unwrap();
+        }
+        let mut idx = Index::open_at(dir.path(), &cache.path().join("index.db")).unwrap();
+        idx.sync().unwrap();
+        (dir, cache, idx)
+    }
+
+    fn paths(hits: &[Hit]) -> Vec<&str> {
+        hits.iter().map(|h| h.path.as_str()).collect()
+    }
+
+    fn set_vec(idx: &Index, file: &str, v: [f32; 2]) {
+        let blob: Vec<u8> = v.iter().flat_map(|f| f.to_le_bytes()).collect();
+        idx.conn.execute("INSERT OR REPLACE INTO vecs(file, start, vec) VALUES(?1, 1, ?2)", params![file, blob]).unwrap();
+    }
+
+    #[test]
+    fn file_named_like_the_question_ranks_first() {
+        let (_d, _c, idx) = project(&[
+            ("src/ContactForm.jsx", "export function ContactForm() {\n  return <form/>;\n}\n"),
+            ("src/notes.md", "The contact form is nice.\n"),
+            ("src/footer.js", "export const year = 2026;\n"),
+        ]);
+        let hits = search(&idx, "where is the contact form", 5, 1, 4, None).unwrap();
+        assert_eq!(paths(&hits)[..2], ["src/ContactForm.jsx", "src/notes.md"]);
+        assert!(hits[0].snippet.starts_with("1: export function ContactForm"));
+        assert!(search(&idx, "the of and", 5, 1, 4, None).unwrap().is_empty());
+    }
+
+    #[test]
+    fn sync_tracks_edits_and_deletions() {
+        let (dir, _c, mut idx) = project(&[("a.txt", "alpha\n"), ("b.txt", "beta\n")]);
+        let stats = idx.sync().unwrap();
+        assert_eq!((stats.scanned, stats.reindexed, stats.removed), (2, 0, 0));
+        fs::write(dir.path().join("a.txt"), "gamma gamma\n").unwrap();
+        fs::remove_file(dir.path().join("b.txt")).unwrap();
+        let stats = idx.sync().unwrap();
+        assert_eq!((stats.reindexed, stats.removed), (1, 1));
+        assert!(search(&idx, "alpha", 5, 1, 4, None).unwrap().is_empty());
+        assert!(search(&idx, "beta", 5, 1, 4, None).unwrap().is_empty());
+        assert_eq!(paths(&search(&idx, "gamma", 5, 1, 4, None).unwrap()), ["a.txt"]);
+    }
+
+    #[test]
+    fn semantic_ranking_uses_vectors_and_sees_new_ones() {
+        let (_d, _c, idx) = project(&[("one.txt", "apples\n"), ("two.txt", "pears\n")]);
+        set_vec(&idx, "one.txt", [1.0, 0.0]);
+        set_vec(&idx, "two.txt", [0.0, 1.0]);
+        // No keyword overlap: only the embedding can rank these.
+        let hits = search(&idx, "zz", 2, 1, 4, Some(&[0.0, 1.0])).unwrap();
+        assert_eq!(paths(&hits), ["two.txt", "one.txt"]);
+        assert_eq!(hits[0].text, "pears");
+
+        // Another connection (like `lt index --embed` next to `lt serve`) changes a vector: the
+        // cached copy must be refreshed, not reused.
+        let other = rusqlite::Connection::open(idx.conn.path().unwrap()).unwrap();
+        let blob: Vec<u8> = [0.0f32, -1.0].iter().flat_map(|f| f.to_le_bytes()).collect();
+        other.execute("UPDATE vecs SET vec = ?1 WHERE file = 'two.txt'", params![blob]).unwrap();
+        assert_eq!(paths(&search(&idx, "zz", 2, 1, 4, Some(&[0.0, 1.0])).unwrap()), ["one.txt", "two.txt"]);
+    }
+
+    #[test]
+    fn judge_fusion_blends_rather_than_replaces() {
+        // The judge agrees with retrieval: order unchanged.
+        assert_eq!(fuse_judge(&[Some(3.0), Some(2.0), Some(1.0)], 10.0, 1.0), [0, 1, 2]);
+        // The judge prefers #1 over #0: they swap, and ties go to the retrieval order.
+        assert_eq!(fuse_judge(&[Some(1.0), Some(3.0), Some(0.5)], 10.0, 1.0), [0, 1, 2]);
+        assert_eq!(fuse_judge(&[Some(1.0), Some(3.0), Some(2.0)], 10.0, 1.0), [1, 0, 2]);
+        // One strong judge vote cannot lift the last hit over a hit both lists like more.
+        assert_eq!(fuse_judge(&[Some(2.0), Some(1.0), Some(0.0), Some(3.0)], 10.0, 1.0), [0, 3, 1, 2]);
+        // Weight 0 ignores the judge; unscored hits rank last on the judge side.
+        assert_eq!(fuse_judge(&[Some(0.0), Some(9.0)], 10.0, 0.0), [0, 1]);
+        assert_eq!(fuse_judge(&[Some(1.0), None, Some(2.0)], 10.0, 1.0), [0, 2, 1]);
+        assert!(fuse_judge(&[], 10.0, 1.0).is_empty());
+    }
 }

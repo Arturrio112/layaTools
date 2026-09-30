@@ -81,3 +81,28 @@ def test_project_profiles_override(tmp_path):
     d.mkdir(parents=True)
     (d / "mine.yaml").write_text("description: x\nquestions:\n  q: {type: noul, instructions: hi}\n")
     assert "mine" in profiles_for(tmp_path)
+
+
+def test_rank_unknown_profile(gateway):
+    with pytest.raises(UnknownProfile):
+        gateway.rank("x", {"a": "b"}, profile="nope")
+
+
+def test_env_profile_dirs(tmp_path, monkeypatch):
+    import os
+
+    from layatools.profiles import PROJECT_SUBDIR, profiles_for
+
+    a, b = tmp_path / "a", tmp_path / "b"
+    for d, desc in ((a, "from a"), (b, "from b")):
+        d.mkdir()
+        (d / "shared.yaml").write_text(f"description: {desc}\nquestions:\n  q: {{type: noul, instructions: hi}}\n")
+    (a / "only_a.yaml").write_text("questions:\n  q: {type: noul, instructions: hi}\n")
+    monkeypatch.setenv("LAYATOOLS_PROFILES", os.pathsep.join([str(a), "", str(b)]))
+    got = profiles_for(None)
+    assert "only_a" in got and got["shared"].description == "from b"  # later directory wins
+
+    proj = tmp_path / "proj"
+    (proj / PROJECT_SUBDIR).mkdir(parents=True)
+    (proj / PROJECT_SUBDIR / "shared.yaml").write_text("description: project\nquestions:\n  q: {type: noul, instructions: hi}\n")
+    assert profiles_for(proj)["shared"].description == "project"  # project beats the env dirs

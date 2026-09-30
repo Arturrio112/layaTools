@@ -121,17 +121,31 @@ Base model `convaiinnovations/laya` (421M). Everything trained on the 10 OSS rep
   and the built-in `relevance` profile is only meaningful with the tuned model.
 - Test beds must be treated read-only: `~/sites` and `~/projects` are the user's real work. Copy anything
   you need to modify, and delete the copies afterwards (the user asked for this).
-- Tests: `uv run pytest -q` (8 pass), `cd rust && cargo test` (2 pass). Nothing tests the HTTP server or the
-  judge fusion; add tests if you change them.
+- Tests: `uv run pytest -q` (19 pass, incl. the HTTP daemon on a random port with fake backend/embedder),
+  `cd rust && cargo test` (7 pass, incl. index sync, keyword/semantic search on temp projects via
+  `Index::open_at`, `fuse_judge`, and the `lt serve` host check). Keep them green when changing either.
+
+## Session 3 (2026-09-30): filling gaps
+
+- `LAYATOOLS_PROFILES` (README promised it, it did not exist) now adds profile dirs between user and project.
+- `lt` honours `LAYATOOLS_PORT` like the Python daemon (was hardcoded 8765) and creates the log dir itself.
+- `lt serve` caches chunk vectors per index (invalidated on its own writes and via `PRAGMA data_version`
+  for other processes' writes); semantic search fetches the text of only the top chunks by rowid.
+- Both HTTP servers reject a non-local `Host` header (DNS-rebinding guard). Still no auth token.
+- Daemon: `/v1/decisions?cwd=` is URL-decoded; unknown profile on `/v1/rank` is a 400 like `/v1/decide`.
+- Judge fusion is a pure `search::fuse_judge`, unit-tested. Tests added on both sides (see Gotchas).
+- The skill now lives in the repo (`skills/laya-decide/SKILL.md`, copy to `~/.claude/skills/`) with the
+  v4 judge outcome; the copy in `~/.claude/skills/` must be re-copied by hand.
+- Not verified here: real embeddings/Laya models (the cloud sandbox blocks HuggingFace), so the semantic
+  path was tested with fixed vectors only. Run `lt index --embed` + a few searches on a real machine.
 
 ## Not built / open ideas
 
-- `lt serve` has no auth (loopback only) and reloads all vectors per search (fine below ~50k chunks).
+- `lt serve` / the daemon have no auth token (loopback + Host check only).
+- A fresh eval set (new questions, new projects) is needed before the next model decision (test split has 3 looks).
 - No file watcher (not needed: the index re-syncs on every call).
 - Decision profiles (`tool_or_skill`, `watchdog` in `~/factory/.layatools/profiles/`, Laya's `guard`) exist but
   are untested beyond a few smoke calls and are uncalibrated; the user wants them for tool/skill routing,
   guard and watchdog use, but the priority is the search engine.
-- The skill at `~/.claude/skills/laya-decide/SKILL.md` says `--judge` gives no benefit; update it with the
-  outcome of the bigger eval.
 - Nothing is wired into `~/factory` yet beyond the two profile YAMLs in its `.layatools/profiles/`
   (uncommitted in that repo).

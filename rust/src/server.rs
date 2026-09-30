@@ -50,7 +50,19 @@ fn respond(req: Request, code: u16, body: serde_json::Value) {
     let _ = req.respond(Response::from_string(body.to_string()).with_status_code(code).with_header(json));
 }
 
+/// True if a Host header names this machine. Browsers always send the page's own host, so this
+/// stops a web page from reaching the server through DNS rebinding; other clients may omit it.
+fn local_host(host: Option<&str>) -> bool {
+    let Some(host) = host else { return true };
+    let name = if host.ends_with(']') { host } else { host.rsplit_once(':').map_or(host, |(h, _)| h) };
+    ["127.0.0.1", "localhost", "[::1]"].iter().any(|l| name.eq_ignore_ascii_case(l))
+}
+
 fn handle(mut req: Request, indexes: Indexes) {
+    let host = req.headers().iter().find(|h| h.field.equiv("Host")).map(|h| h.value.as_str().to_string());
+    if !local_host(host.as_deref()) {
+        return respond(req, 403, serde_json::json!({"error": "forbidden host"}));
+    }
     match (req.method().clone(), req.url().to_string().as_str()) {
         (Method::Get, "/health") => respond(req, 200, serde_json::json!({"ok": true})),
         (Method::Post, "/v1/search") => {
@@ -86,4 +98,19 @@ fn run(indexes: &Indexes, r: SearchReq) -> Result<serde_json::Value> {
         hits.truncate(r.k);
     }
     Ok(serde_json::to_value(hits)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::local_host;
+
+    #[test]
+    fn only_local_hosts_pass() {
+        assert!(local_host(None));
+        assert!(local_host(Some("127.0.0.1:8766")));
+        assert!(local_host(Some("LocalHost")));
+        assert!(local_host(Some("[::1]:8766")));
+        assert!(!local_host(Some("127.0.0.1.evil.com:8766")));
+        assert!(!local_host(Some("attacker.test")));
+    }
 }
