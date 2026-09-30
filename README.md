@@ -105,3 +105,21 @@ questions written by 4 Claude subagents (each with a private working dir), some 
 cases (16.4k train cases, ~62 min on the RTX 5080). Held-out repos (530 questions): top-1 0.879 -> 0.892, MRR
 0.934 -> 0.939 (a small change: the OSS benchmark was already near its ceiling); the gain shows up on the real projects.
 Questions were written from the first ~260 characters of each chunk, so some labels are approximate.
+
+## End-to-end test: does `lt` save an agent tokens?
+
+12 test-split questions on 7 real projects, each answered by a fresh Sonnet subagent twice: once with plain
+Grep/Read/find only, once told to run `lt search --judge -k 5` first (24 runs).
+
+| | without lt | with lt |
+|---|---|---|
+| subagent tokens (mean) | 29,142 | 28,579 (-1.9%) |
+| tool calls (total) | 37 | 24 (-35%) |
+| correct file | 11/12 | 10/12 |
+
+Reading: on small projects a plain grep agent already finds the file in 2-4 calls, and ~27k of each run's
+tokens is fixed subagent overhead that no search tool can remove, so the token saving is negligible here;
+`lt` mainly saves tool calls (about one third fewer), not accuracy. One `lt` miss (`astro.config.mjs` for "site
+title and main config") and one strict miss (the view file instead of the route page); the no-lt miss was on the
+same ambiguous question. n=12 is too small to separate the accuracy of the two. The benefit should grow with
+repo size (these are 8-340 indexed files), which this test does not cover.

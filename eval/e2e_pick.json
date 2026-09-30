@@ -1,0 +1,139 @@
+[
+ {
+  "project": "jobBoard",
+  "path": "projects/jobBoard",
+  "q": "which e2e test covers a new employer posting their first job",
+  "expect": [
+   "e2e/tests/employer-new.spec.ts"
+  ],
+  "also": [
+   "e2e/helpers/employer.ts"
+  ],
+  "split": "test"
+ },
+ {
+  "project": "jobBoard",
+  "path": "projects/jobBoard",
+  "q": "where is the import of jobs from the state employment agency implemented",
+  "expect": [
+   "backend/app/Services/Nva/NvaSync.php"
+  ],
+  "also": [
+   "backend/app/Console/Commands/SyncNvaListings.php",
+   "backend/app/Services/Nva/NvaClient.php"
+  ],
+  "split": "test"
+ },
+ {
+  "project": "jobBoard",
+  "path": "projects/jobBoard",
+  "q": "where is schema.org JobPosting structured data generated",
+  "expect": [
+   "frontend/lib/job-posting-schema.ts"
+  ],
+  "also": [
+   "frontend/app/jobs/[id]/page.tsx"
+  ],
+  "split": "test"
+ },
+ {
+  "project": "jobBoard",
+  "path": "projects/jobBoard",
+  "q": "how do I run the backend tests in docker",
+  "expect": [
+   "backend/docker/run-tests.sh"
+  ],
+  "also": [
+   "Makefile",
+   "docker-compose.yml",
+   "backend/README.md",
+   "README.md"
+  ],
+  "split": "test"
+ },
+ {
+  "project": "ventmernieks",
+  "path": "projects/ventmernieks",
+  "q": "where are hreflang alternates and sitemap configured",
+  "expect": [
+   "astro.config.mjs"
+  ],
+  "also": [
+   "src/layouts/BaseLayout.astro",
+   "src/i18n/slugs.ts"
+  ],
+  "split": "test"
+ },
+ {
+  "project": "ventmernieks",
+  "path": "projects/ventmernieks",
+  "q": "where are the russian service pages",
+  "expect": [
+   "src/pages/ru/uslugi/[slug].astro"
+  ],
+  "also": [],
+  "split": "test"
+ },
+ {
+  "project": "dentist-lv",
+  "path": "sites/dentist-lv",
+  "q": "which check makes sure both languages have the same translation keys",
+  "expect": [
+   "e2e/factory/i18n-parity.mjs"
+  ],
+  "also": [],
+  "split": "test"
+ },
+ {
+  "project": "dentist-lv",
+  "path": "sites/dentist-lv",
+  "q": "where is the English privacy policy page",
+  "expect": [
+   "src/pages/en/privacy.astro"
+  ],
+  "also": [],
+  "split": "test"
+ },
+ {
+  "project": "mireglass",
+  "path": "sites/mireglass",
+  "q": "where is the newsletter signup page",
+  "expect": [
+   "src/pages/newsletter.astro"
+  ],
+  "also": [],
+  "split": "test"
+ },
+ {
+  "project": "Brutes",
+  "path": "projects/ClientDemos/Brutes",
+  "q": "where are the route names for each language defined",
+  "expect": [
+   "src/i18n/routes.ts"
+  ],
+  "also": [
+   "src/pages/[locale]/[...slug].astro"
+  ],
+  "split": "test"
+ },
+ {
+  "project": "onboard-test-1",
+  "path": "projects/onboard-test-1",
+  "q": "where is the site title and main config",
+  "expect": [
+   "src/data/config.ts"
+  ],
+  "also": [],
+  "split": "test"
+ },
+ {
+  "project": "emailer",
+  "path": "projects/emailer",
+  "q": "where is the send email endpoint implemented",
+  "expect": [
+   "src/versions/v1/services/email/email.controller.js"
+  ],
+  "also": [],
+  "split": "test"
+ }
+]

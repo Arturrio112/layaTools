@@ -54,6 +54,9 @@ vs ~24 ms, stays opt-in. Fusion weights (JUDGE_WEIGHT, RRF_K, SEM_WEIGHT, NAME_W
 Caveats: questions are by one author (me), so phrasing is biased toward file names; several projects are
 small (3-5 test questions); MainLandingPage is dev-only. Not done: end-to-end token savings for a Claude Code task.
 
+### Session 2c: end-to-end token test (done)
+12 questions x with/without `lt` via subagents: -1.9% tokens, -35% tool calls, 11/12 vs 10/12 correct (details in README). Not worth much on small repos; test on a large repo before claiming savings.
+
 ### Session 2b: judge v3 retrain (done)
 Training data `~/.local/share/layatools/train_data_web/` (chunks, questions, `cases_web.jsonl`), merged cases
 `train_data/cases3.jsonl`, log `train_v3.log`, OSS clones in `~/.local/share/layatools/oss_web/`. Active model
