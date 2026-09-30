@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -91,6 +92,14 @@ def _builtin_profiles() -> dict[str, Profile]:
 PROJECT_SUBDIR = Path(".layatools") / "profiles"
 
 
+def env_dirs() -> list[Path]:
+    """Extra profile directories from `LAYATOOLS_PROFILES` (separated like PATH)."""
+    return [Path(d).expanduser() for d in os.environ.get("LAYATOOLS_PROFILES", "").split(os.pathsep) if d]
+
+
 def profiles_for(project: Path | None) -> dict[str, Profile]:
-    """Laya presets + shipped + user-level + the project's `.layatools/profiles/` (highest priority)."""
-    return load_profiles(USER_DIR, (project / PROJECT_SUBDIR) if project else None)
+    """Laya presets + shipped + user-level + `LAYATOOLS_PROFILES` + the project's `.layatools/profiles/`.
+
+    Later sources win, so the project's own profiles have the highest priority.
+    """
+    return load_profiles(USER_DIR, *env_dirs(), (project / PROJECT_SUBDIR) if project else None)

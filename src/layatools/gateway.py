@@ -28,18 +28,18 @@ class Gateway:
         Returns `{"answers": {qid: {"value", "conf"}}, "escalate": [qids]}`. Anything listed in
         `escalate` fell below the confidence threshold: the calling LLM should decide it itself.
         """
-        try:
-            prof = self.profiles[profile]
-        except KeyError:
-            raise UnknownProfile(
-                f"unknown profile {profile!r}; available: {sorted(self.profiles)}"
-            ) from None
+        prof = self._profile(profile)
         threshold = prof.min_confidence if min_confidence is None else min_confidence
         if isinstance(state, str):
             state = {prof.state_field or "message": state}
         raw = self.backend.predict(state, prof.questions, prof.model)
         return compact(raw["answers"], threshold)
 
+    def _profile(self, name: str) -> Profile:
+        try:
+            return self.profiles[name]
+        except KeyError:
+            raise UnknownProfile(f"unknown profile {name!r}; available: {sorted(self.profiles)}") from None
 
     def rank(
         self, task: str, items: dict[str, str], profile: str = "relevance", limit: int | None = None
@@ -48,7 +48,7 @@ class Gateway:
 
         Meant for brownfield exploration: rank candidate files so the LLM reads only the top few.
         """
-        prof = self.profiles[profile]
+        prof = self._profile(profile)
         scored = []
         for item_id, text in items.items():
             raw = self.backend.predict({"task": task, "content": text}, prof.questions, prof.model)["answers"]

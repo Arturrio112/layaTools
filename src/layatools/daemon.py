@@ -9,6 +9,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -22,11 +23,24 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("LAYATOOLS_PORT", "8765"))
 URL = f"http://{HOST}:{PORT}"
 LOG = Path.home() / ".cache" / "layatools" / "daemon.log"
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "[::1]"}
 
 
-def make_handler(gateway: Gateway) -> type[BaseHTTPRequestHandler]:
+def local_host(host: str | None) -> bool:
+    """True if a Host header names this machine. Browsers always send the page's own host, so this
+    stops a web page from reaching the daemon through DNS rebinding; non-browser clients may omit it."""
+    if not host:
+        return True
+    name = host.rsplit(":", 1)[0] if not host.endswith("]") else host
+    return name.lower() in LOCAL_HOSTS
+
+
+def make_handler(gateway: Gateway, embedder: Any = None) -> type[BaseHTTPRequestHandler]:
     lock = threading.Lock()  # one forward pass at a time; the model is not thread-safe
-    embedder = Embedder()  # has its own lock, so embedding never waits on a Laya judgement
+    embedder = embedder or Embedder()  # has its own lock, so embedding never waits on a Laya judgement
+
+    def gateway_for(cwd: str | None) -> Gateway:
+        return Gateway(gateway.backend, profiles_for(Path(cwd)) if cwd else gateway.profiles)
 
     class Handler(BaseHTTPRequestHandler):
         def _send(self, code: int, body: Any) -> None:
@@ -37,22 +51,35 @@ def make_handler(gateway: Gateway) -> type[BaseHTTPRequestHandler]:
             self.end_headers()
             self.wfile.write(data)
 
+        def _forbidden(self) -> bool:
+            if local_host(self.headers.get("Host")):
+                return False
+            self._send(403, {"error": "forbidden host"})
+            return True
+
         def do_GET(self) -> None:
-            if self.path == "/health":
+            if self._forbidden():
+                return
+            url = urllib.parse.urlsplit(self.path)
+            if url.path == "/health":
                 self._send(200, {"ok": True, "embed_model": embedder.model_name})
-            elif self.path.startswith("/v1/decisions"):
-                cwd = self.path.partition("?cwd=")[2]
-                self._send(200, Gateway(gateway.backend, profiles_for(Path(cwd)) if cwd else gateway.profiles).list_decisions())
+            elif url.path == "/v1/decisions":
+                cwd = urllib.parse.parse_qs(url.query).get("cwd", [None])[0]
+                self._send(200, gateway_for(cwd).list_decisions())
             else:
                 self._send(404, {"error": "not found"})
 
         def do_POST(self) -> None:
+            if self._forbidden():
+                return
             try:
                 req = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                if not isinstance(req, dict):
+                    raise ValueError("request body must be a JSON object")
                 if self.path == "/v1/embed":
                     vecs = embedder.embed(req["texts"], query=bool(req.get("query")))
                     return self._send(200, {"model": embedder.model_name, **pack(vecs)})
-                gw = Gateway(gateway.backend, profiles_for(Path(req["cwd"])) if req.get("cwd") else gateway.profiles)
+                gw = gateway_for(req.get("cwd"))
                 with lock:
                     if self.path == "/v1/decide":
                         out = gw.decide(

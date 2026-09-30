@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 use ignore::WalkBuilder;
 use regex::Regex;
 use rusqlite::{params, Connection};
+use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -21,6 +22,18 @@ const SKIP_NAMES: &[&str] = &["package-lock.json", "pnpm-lock.yaml", "yarn.lock"
 pub struct Index {
     pub conn: Connection,
     pub root: PathBuf,
+    /// Chunk vectors kept in memory between searches (`lt serve`), so a search does not re-read
+    /// every blob. Dropped when this connection changes chunks or vectors, and reloaded when
+    /// another process (e.g. `lt index --embed`) has written to the database since.
+    vec_cache: RefCell<Option<VecCache>>,
+}
+
+/// One embedded chunk: the chunks-table rowid (to fetch its text), file, start, end, unit vector.
+pub type ChunkVec = (i64, String, i64, i64, Vec<f32>);
+
+struct VecCache {
+    data_version: i64,
+    rows: Vec<ChunkVec>,
 }
 
 pub struct SyncStats {
@@ -46,7 +59,14 @@ fn db_path(root: &Path) -> Result<PathBuf> {
 impl Index {
     pub fn open(root: &Path) -> Result<Self> {
         let root = root.canonicalize().with_context(|| format!("no such directory: {}", root.display()))?;
-        let conn = Connection::open(db_path(&root)?)?;
+        let db = db_path(&root)?;
+        Self::open_at(&root, &db)
+    }
+
+    /// Open the index for `root` stored in the database file `db`.
+    pub fn open_at(root: &Path, db: &Path) -> Result<Self> {
+        let root = root.canonicalize().with_context(|| format!("no such directory: {}", root.display()))?;
+        let conn = Connection::open(db)?;
         conn.execute_batch(
             "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;
              CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime_ns INTEGER, size INTEGER);
@@ -57,7 +77,32 @@ impl Index {
                  file UNINDEXED, start UNINDEXED, end UNINDEXED, text UNINDEXED,
                  tokenize='porter unicode61');",
         )?;
-        Ok(Self { conn, root })
+        Ok(Self { conn, root, vec_cache: RefCell::new(None) })
+    }
+
+    /// Every chunk vector, loaded once and reused while the database is unchanged.
+    pub fn vectors(&self) -> Result<Ref<'_, Vec<ChunkVec>>> {
+        let version: i64 = self.conn.query_row("PRAGMA data_version", [], |r| r.get(0))?;
+        if self.vec_cache.borrow().as_ref().map(|c| c.data_version) != Some(version) {
+            let mut stmt = self.conn.prepare(
+                "SELECT c.rowid, v.file, v.start, c.end, v.vec FROM vecs v
+                 JOIN chunks c ON c.file = v.file AND c.start = v.start",
+            )?;
+            let rows = stmt
+                .query_map([], |r| {
+                    let blob: Vec<u8> = r.get(4)?;
+                    let vec = blob.chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, vec))
+                })?
+                .collect::<rusqlite::Result<_>>()?;
+            *self.vec_cache.borrow_mut() = Some(VecCache { data_version: version, rows });
+        }
+        Ok(Ref::map(self.vec_cache.borrow(), |c| &c.as_ref().expect("just filled").rows))
+    }
+
+    /// The full text of a chunk by its rowid.
+    pub fn chunk_text(&self, rowid: i64) -> Result<String> {
+        Ok(self.conn.query_row("SELECT text FROM chunks WHERE rowid = ?1", [rowid], |r| r.get(0))?)
     }
 
     /// Bring the index up to date with the working tree. Cheap when nothing changed (stat only).
@@ -116,6 +161,9 @@ impl Index {
             removed += 1;
         }
         tx.commit()?;
+        if reindexed + removed > 0 {
+            self.vec_cache.get_mut().take();
+        }
         Ok(SyncStats { scanned, reindexed, removed })
     }
 
@@ -149,6 +197,7 @@ impl Index {
                 .ok();
             if stored.as_deref() != Some(model.as_str()) {
                 self.conn.execute("DELETE FROM vecs", [])?;
+                self.vec_cache.get_mut().take();
                 self.conn.execute(
                     "INSERT INTO meta(key, value) VALUES('embed_model', ?1)
                      ON CONFLICT(key) DO UPDATE SET value=?1",
@@ -167,6 +216,7 @@ impl Index {
                 )?;
             }
             tx.commit()?;
+            self.vec_cache.get_mut().take();
             done += batch.len();
         }
         Ok(done)

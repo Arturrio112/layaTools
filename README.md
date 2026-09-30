@@ -24,9 +24,15 @@ Result shape:
 
 ## Profiles
 
-Laya's built-in presets (`guard`, `moderation`, `triage`, `model_router`, `email`) are always
-available. Add your own as YAML in `profiles/` (or set `LAYATOOLS_PROFILES`); see
-`profiles/support_route.yaml`. The first real call downloads Laya's model weights.
+Laya's built-in presets (`guard`, `moderation`, `triage`, `model_router`, `email`) and the shipped
+`relevance` profile are always available. Add your own as YAML (example: `tests/support_route.yaml`) in,
+from lowest to highest priority: `~/.config/layatools/profiles/`, any directories listed in
+`LAYATOOLS_PROFILES` (separated like `PATH`), and the project's own `.layatools/profiles/`. A later source
+wins on a name clash. The first real call downloads Laya's model weights.
+
+The warm daemon (`layatools serve-http`, auto-started by the CLI and by `lt`) listens on
+`127.0.0.1:${LAYATOOLS_PORT:-8765}`; both sides honour `LAYATOOLS_PORT`. It and `lt serve` bind loopback
+only and reject requests whose `Host` header is not local (a guard against DNS rebinding from a browser).
 
 ## `lt`: fast codebase search for LLMs (Rust)
 
@@ -45,8 +51,17 @@ afterwards `lt search` fuses keyword, name and embedding rankings automatically 
 the fly; falls back to keyword-only if the daemon is down; `--lexical` forces that). Top-5 accuracy:
 see "Evaluation" below.
 
+`lt serve` keeps each project's chunk vectors in memory between searches and reloads them only when
+the index changes (including writes by another `lt` process).
+
 `--judge` re-ranks the top candidates with a fine-tuned Laya relevance judge (via the Python daemon,
 `layatools serve-http`), fused with the retrieval order. Opt-in. See "Fine-tuning" below.
+
+Claude Code skill: `skills/laya-decide/SKILL.md` tells the agent to run `lt search` before exploring;
+install it with `mkdir -p ~/.claude/skills && cp -r skills/laya-decide ~/.claude/skills/`.
+
+Tests: `uv run pytest -q` (gateway, profiles, and the HTTP daemon with a fake backend) and
+`cd rust && cargo test` (tokeniser, index sync, keyword and semantic search, judge fusion, host check).
 
 ## Fine-tuning the judge (`train/`)
 
