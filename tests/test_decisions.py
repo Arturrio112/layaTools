@@ -12,11 +12,12 @@ def test_log_and_join_outcomes(decision_log_file):
     decision_log.log_outcome(a, {"labels": {"q": "x"}})  # the latest outcome wins
     with decision_log_file.open("a") as f:
         f.write('{"type": "decision", "id": "torn')  # a crash mid-write must not hide the rest
+    c = decision_log.log_decision("p", "after the tear", {"answers": {}})  # must not be glued onto the torn line
     rows = decision_log.read()
-    assert [r["id"] for r in rows] == [a, b]
+    assert [r["id"] for r in rows] == [a, b, c]
     assert rows[0]["outcome"] == {"labels": {"q": "x"}} and rows[0]["meta"] == {"t": 1}
     assert rows[1]["outcome"] is None
-    assert [r["id"] for r in decision_log.read(profile="p")] == [a]
+    assert [r["id"] for r in decision_log.read(profile="p")] == [a, c]
 
 
 def test_logging_can_be_turned_off(monkeypatch, tmp_path):
@@ -92,3 +93,14 @@ def test_mcp_search_runs_lt(tmp_path, monkeypatch):
     failing.write_text("#!/bin/sh\necho boom >&2\nexit 1\n")
     failing.chmod(0o755)
     assert json.loads(search_code("x", lt=str(failing))) == {"error": "boom"}
+
+
+def test_example_profiles_load():
+    from pathlib import Path
+
+    from layatools.profiles import load_profiles
+
+    got = load_profiles(Path(__file__).parent.parent / "examples" / "profiles", builtin=False)
+    assert set(got) == {"status_triage", "stall_triage"}
+    assert got["status_triage"].summary()["answers"]["kind"] == "choice: decision|finished|error|waiting|routine"
+    assert got["stall_triage"].state_field == "tail"

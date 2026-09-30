@@ -43,6 +43,11 @@ Over HTTP: `POST /v1/decide` takes `meta`, `"log": false`, and a batch as `"item
 {id, outcome}` records an outcome. The MCP server offers `list_decisions`, `decide`, `record_outcome` and
 `search` (runs `lt search --json`), so any MCP-capable harness gets search and decisions with one config entry.
 
+`examples/profiles/` has two uncalibrated, shadow-only profiles for agent supervisors (after Firstmate's
+watch engine): `status_triage` (does this status/log line need a person?) and `stall_triage` (a step went
+silent: waiting, stuck or finished?). Enable with `LAYATOOLS_PROFILES=examples/profiles` or copy them into a
+project's `.layatools/profiles/`.
+
 Shadow mode is the intended way to adopt a profile: the caller asks, logs, and keeps doing what it did
 before, until `eval` on real outcomes shows the profile can be trusted. The landing-page factory does this for
 model routing (`lib/laya.mjs` and `.layatools/profiles/step_route.yaml` there).

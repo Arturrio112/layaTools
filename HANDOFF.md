@@ -121,7 +121,7 @@ Base model `convaiinnovations/laya` (421M). Everything trained on the 10 OSS rep
   and the built-in `relevance` profile is only meaningful with the tuned model.
 - Test beds must be treated read-only: `~/sites` and `~/projects` are the user's real work. Copy anything
   you need to modify, and delete the copies afterwards (the user asked for this).
-- Tests: `uv run pytest -q` (30 pass, incl. the HTTP daemon, decision log and calibration on a random port with fake backend/embedder),
+- Tests: `uv run pytest -q` (31 pass, incl. the HTTP daemon, decision log and calibration on a random port with fake backend/embedder),
   `cd rust && cargo test` (7 pass, incl. index sync, keyword/semantic search on temp projects via
   `Index::open_at`, `fuse_judge`, and the `lt serve` host check). Keep them green when changing either.
 
@@ -150,7 +150,11 @@ Base model `convaiinnovations/laya` (421M). Everything trained on the 10 OSS rep
   records the run's outcome (status, spend, model, fix attempts) at the end. Never acts on the answer.
 - Next: turn shadow on, collect a few dozen tickets, label, `eval`. A generic `layatools train <profile>`
   (generalising `train/train_relevance.py` to any profile from logged labels) is the step after that.
-- Tests: `uv run pytest -q` 30 pass.
+- `examples/profiles/status_triage.yaml`, `stall_triage.yaml` (uncalibrated, shadow only). The factory asks
+  `stall_triage` in shadow mode when its silence ladder reports a step (it keeps its own copy).
+- Decision log: a torn last line (writer killed mid-record) is no longer glued to the next record.
+- Factory side of all this: `docs/HANDOFF-2026-09-30-cloud-session.md` on the factory branch.
+- Tests: `uv run pytest -q` 31 pass.
 
 ## Not built / open ideas
 

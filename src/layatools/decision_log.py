@@ -47,8 +47,14 @@ def _append(record: dict[str, Any], path: Path | None) -> bool:
     line = json.dumps(record, separators=(",", ":"), ensure_ascii=False) + "\n"
     with _lock:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as f:
-            f.write(line)
+        with path.open("a+b") as f:
+            # A torn last line (a writer killed mid-record) has no newline: start fresh, or this record is lost too.
+            f.seek(0, os.SEEK_END)
+            if f.tell() > 0:
+                f.seek(-1, os.SEEK_END)
+                if f.read(1) != b"\n":
+                    line = "\n" + line
+            f.write(line.encode("utf-8"))
     return True
 
 

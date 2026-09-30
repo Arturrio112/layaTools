@@ -1,0 +1,24 @@
+# Example profile, UNCALIBRATED: use in shadow mode only (log it, act on nothing) until
+# `layatools eval status_triage` on labelled outcomes gives it a threshold. Enable with
+# LAYATOOLS_PROFILES=<path to this directory> or copy it into <project>/.layatools/profiles/.
+#
+# After Firstmate's watch engine: a supervisor reads status/log lines from agents and must
+# decide which deserve a person. Rules stay the backstop; this only suggests. Swallow a line
+# only on a confident "routine", everything else surfaces.
+name: status_triage
+description: Does this agent status or log line need a person? (example; uncalibrated, shadow only)
+min_confidence: 0.85
+state_field: line
+questions:
+  kind:
+    type: choice
+    instructions: What is `line` reporting?
+    criteria:
+      decision: the agent asks a person to choose, approve or answer something
+      finished: the task is done or delivered
+      error: something failed, crashed, was refused or denied
+      waiting: the agent is deliberately waiting on something slow (a long test run, a service, a quota reset)
+      routine: ordinary progress with nothing to act on
+  needs_person:
+    type: noul
+    instructions: Should a person look at `line` soon?
