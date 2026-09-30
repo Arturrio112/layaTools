@@ -121,7 +121,7 @@ Base model `convaiinnovations/laya` (421M). Everything trained on the 10 OSS rep
   and the built-in `relevance` profile is only meaningful with the tuned model.
 - Test beds must be treated read-only: `~/sites` and `~/projects` are the user's real work. Copy anything
   you need to modify, and delete the copies afterwards (the user asked for this).
-- Tests: `uv run pytest -q` (19 pass, incl. the HTTP daemon on a random port with fake backend/embedder),
+- Tests: `uv run pytest -q` (30 pass, incl. the HTTP daemon, decision log and calibration on a random port with fake backend/embedder),
   `cd rust && cargo test` (7 pass, incl. index sync, keyword/semantic search on temp projects via
   `Index::open_at`, `fuse_judge`, and the `lt serve` host check). Keep them green when changing either.
 
@@ -138,6 +138,19 @@ Base model `convaiinnovations/laya` (421M). Everything trained on the 10 OSS rep
   v4 judge outcome; the copy in `~/.claude/skills/` must be re-copied by hand.
 - Not verified here: real embeddings/Laya models (the cloud sandbox blocks HuggingFace), so the semantic
   path was tested with fixed vectors only. Run `lt index --embed` + a few searches on a real machine.
+
+## Session 3b (2026-09-30): decisions you can measure
+
+- `decision_log.py`: every decide (HTTP, MCP) is appended with an `id`; `outcome` records what happened.
+- `calibrate.py` + `layatools eval`: accuracy per question, precision/coverage by confidence, and the
+  recommended `min_confidence` for a target precision. `layatools export` joins decisions with outcomes.
+- Batch decide (`items`), `meta`, `"log": false`; MCP `record_outcome` and `search` (shells out to `lt`).
+- Factory (`landingPageSoftwareFactory`, branch `claude/laya-shadow-routing`): `lib/laya.mjs` asks the
+  `step_route` profile before each fresh implement when `factory.config.json` `laya.shadow` is true, and
+  records the run's outcome (status, spend, model, fix attempts) at the end. Never acts on the answer.
+- Next: turn shadow on, collect a few dozen tickets, label, `eval`. A generic `layatools train <profile>`
+  (generalising `train/train_relevance.py` to any profile from logged labels) is the step after that.
+- Tests: `uv run pytest -q` 30 pass.
 
 ## Not built / open ideas
 

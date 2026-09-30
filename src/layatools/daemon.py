@@ -15,6 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from . import decision_log
 from .gateway import Gateway, UnknownProfile
 from .embed import Embedder, pack
 from .profiles import profiles_for
@@ -80,11 +81,11 @@ def make_handler(gateway: Gateway, embedder: Any = None) -> type[BaseHTTPRequest
                     vecs = embedder.embed(req["texts"], query=bool(req.get("query")))
                     return self._send(200, {"model": embedder.model_name, **pack(vecs)})
                 gw = gateway_for(req.get("cwd"))
+                if self.path == "/v1/outcome":
+                    return self._send(200, {"ok": True, "logged": decision_log.log_outcome(req["id"], req["outcome"])})
                 with lock:
                     if self.path == "/v1/decide":
-                        out = gw.decide(
-                            req["profile"], req.get("state", req.get("text")), req.get("min_confidence")
-                        )
+                        out = decide(gw, req)
                     elif self.path == "/v1/rank":
                         out = gw.rank(
                             req["task"], req["items"], req.get("profile", "relevance"), req.get("limit")
@@ -101,6 +102,26 @@ def make_handler(gateway: Gateway, embedder: Any = None) -> type[BaseHTTPRequest
             pass
 
     return Handler
+
+
+def decide(gw: Gateway, req: dict[str, Any]) -> Any:
+    """One item (`text` or `state`) or a batch (`items`: a list of texts/states, answered in order).
+    Each answer is logged with `meta` unless `"log": false`, and carries its log `id` for outcomes."""
+    batch = "items" in req
+    items = req["items"] if batch else [req.get("state", req.get("text"))]
+    if not isinstance(items, list) or any(not isinstance(i, (str, dict)) for i in items):
+        raise ValueError("`items` must be a list of texts or state objects")
+    if not batch and items[0] is None:
+        raise KeyError("text")
+    out = []
+    for item in items:
+        result = gw.decide(req["profile"], item, req.get("min_confidence"))
+        if req.get("log", True):
+            decision_id = decision_log.log_decision(req["profile"], item, result, req.get("meta"))
+            if decision_id:
+                result = {"id": decision_id, **result}
+        out.append(result)
+    return out if batch else out[0]
 
 
 def serve(gateway: Gateway) -> None:
