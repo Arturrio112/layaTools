@@ -54,6 +54,9 @@ vs ~24 ms, stays opt-in. Fusion weights (JUDGE_WEIGHT, RRF_K, SEM_WEIGHT, NAME_W
 Caveats: questions are by one author (me), so phrasing is biased toward file names; several projects are
 small (3-5 test questions); MainLandingPage is dev-only. Not done: end-to-end token savings for a Claude Code task.
 
+### Session 2d: judge v4 (done)
+More data (`train_data_web2/`, `cases4.jsonl`, log `train_v4.log`), questions from full chunk text. Active model = v4; v3 kept as `models/laya-code-relevance-v3`, v2 as `-v2`. Real eval judge vs hybrid: 19 better / 5 worse, test MRR 0.776 -> 0.824. Diminishing returns: v3->v4 is within noise. Test split has had 3 looks; to keep measuring honestly, write a fresh eval set (new questions, new projects) before the next model decision. `sample_chunks.py` gained `--seed/--exclude/--only`.
+
 ### Session 2c: end-to-end token test (done)
 12 questions x with/without `lt` via subagents: -1.9% tokens, -35% tool calls, 11/12 vs 10/12 correct (details in README). Not worth much on small repos; test on a large repo before claiming savings.
 

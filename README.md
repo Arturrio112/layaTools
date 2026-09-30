@@ -85,7 +85,8 @@ Held-out test half, k=5 (n=54; MRR over the top 5):
 | lexical | 36 | 48 | 48 | 0.765 | ~270 | 9 ms |
 | hybrid (default) | 38 | 46 | 47 | 0.776 | ~275 | 24 ms |
 | hybrid + judge (v2) | 38 | 46 | 50 | 0.792 | ~290 | 300 ms |
-| hybrid + judge (v3, current) | 39 | 48 | 50 | 0.811 | ~283 | 300 ms |
+| hybrid + judge (v3) | 39 | 48 | 50 | 0.811 | ~283 | 300 ms |
+| hybrid + judge (v4, current) | 40 | 50 | 50 | 0.824 | ~287 | 300 ms |
 
 Dev half (n=69): hybrid 47/60/64 (MRR 0.78) vs lexical 42/55/59 (0.70); judge v2 50/62/63 (0.80); judge v3 49/60/63 (0.79 vs hybrid 0.77).
 Honest reading: `lt` finds an acceptable file in the top 5 for ~87-93% of questions (hybrid) vs ~32-43% for
@@ -96,7 +97,7 @@ The v3 judge (retrained with 6.7k extra web-project cases, see below) improves t
 (p~0.004): a real but modest gain (MRR +0.03), at ~12x the latency, so it is still opt-in. The current fusion weights were already at
 the optimum or on a flat plateau on dev, so none were changed.
 
-### v3 retrain (web-style projects)
+### v3 and v4 retrains (web-style projects)
 
 Added 9 web-style OSS repos (astro-paper, breeze, commerce, create-t3-app, taxonomy, vitepress,
 node-express-realworld-example-app for training; polka and realworld held out), 789 chunks, short locator
@@ -105,6 +106,13 @@ questions written by 4 Claude subagents (each with a private working dir), some 
 cases (16.4k train cases, ~62 min on the RTX 5080). Held-out repos (530 questions): top-1 0.879 -> 0.892, MRR
 0.934 -> 0.939 (a small change: the OSS benchmark was already near its ceiling); the gain shows up on the real projects.
 Questions were written from the first ~260 characters of each chunk, so some labels are approximate.
+
+v4 adds 9.7k cases from 938 fresh chunks (5 new repos: next-auth-example, koa, movies, next-learn, jetstream, plus a
+second sample of 6 earlier ones) with questions written from each chunk's *full* text: 26.2k train cases, ~1.9 h.
+Held-out OSS repos got marginally worse (top-1 0.892 -> 0.881, MRR 0.939 -> 0.934, noise level), but the real
+projects improved a little more: dev MRR 0.793 -> 0.801, test 0.811 -> 0.824. Judge vs hybrid across dev+test with
+v4: better rank on 19 questions, worse on 5 (sign test p~0.007). Gains between v3 and v4 are small and within noise
+on 123 questions; v4 is active because it was no worse on dev and better on test (test has now had 3 looks).
 
 ## End-to-end test: does `lt` save an agent tokens?
 

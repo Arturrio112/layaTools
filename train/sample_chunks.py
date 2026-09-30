@@ -1,6 +1,6 @@
 """Sample diverse chunks from indexed repos for question writing.
 
-    python train/sample_chunks.py <oss_dir> <out_dir>
+    python train/sample_chunks.py <oss_dir> <out_dir> [--seed N] [--exclude <dir with earlier *.chunks.jsonl>] [--only repo,repo]
 
 Writes <out_dir>/<repo>.chunks.jsonl with {id, file, start, end, text}. At most 2 chunks per file so a
 few big files cannot dominate, and only chunks with real content (12+ non-blank lines).
@@ -18,13 +18,20 @@ SKIP = re.compile(r"(^|/)(dist|build|vendor|node_modules|\.github|docs?/_build)/
 
 
 def main() -> None:
-    oss, out = Path(sys.argv[1]), Path(sys.argv[2])
+    args = sys.argv[1:]
+    opt = lambda name, default=None: args[args.index(name) + 1] if name in args else default
+    oss, out = Path(args[0]), Path(args[1])
     out.mkdir(parents=True, exist_ok=True)
-    rng = random.Random(7)
-    for repo in sorted(p for p in oss.iterdir() if p.is_dir()):
+    rng = random.Random(int(opt("--seed", 7)))
+    only = set(opt("--only", "").split(",")) - {""}
+    used = set()
+    if opt("--exclude"):
+        for f in Path(opt("--exclude")).glob("*.chunks.jsonl"):
+            used |= {json.loads(l)["id"] for l in f.read_text().splitlines() if l.strip()}
+    for repo in sorted(p for p in oss.iterdir() if p.is_dir() and (not only or p.name in only)):
         lines = subprocess.run(["lt", "-C", str(repo), "export"], capture_output=True, text=True, check=True).stdout.splitlines()
         chunks = [json.loads(l) for l in lines]
-        good = [c for c in chunks if not SKIP.search(c["file"]) and sum(1 for t in c["text"].splitlines() if t.strip()) >= 12]
+        good = [c for c in chunks if f"{repo.name}:{c['file']}:{c['start']}" not in used and not SKIP.search(c["file"]) and sum(1 for t in c["text"].splitlines() if t.strip()) >= 12]
         rng.shuffle(good)
         per_file: dict[str, int] = {}
         picked = []
