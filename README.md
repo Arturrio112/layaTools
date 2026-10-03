@@ -60,6 +60,10 @@ from lowest to highest priority: `~/.config/layatools/profiles/`, any directorie
 `LAYATOOLS_PROFILES` (separated like `PATH`), and the project's own `.layatools/profiles/`. A later source
 wins on a name clash. The first real call downloads Laya's model weights.
 
+Laya checkpoint: by default Laya's own Router picks (English text -> `english`, other languages -> `multilingual`).
+`LAYATOOLS_LAYA_MODEL=typed-decisions` (or `english` / `multilingual`) forces one checkpoint for every call that
+does not use a profile's own `model:`. Measure before switching; the typed-decisions gains are for its four trained workflows.
+
 The warm daemon (`layatools serve-http`, auto-started by the CLI and by `lt`) listens on
 `127.0.0.1:${LAYATOOLS_PORT:-8765}`; both sides honour `LAYATOOLS_PORT`. It and `lt serve` bind loopback
 only and reject requests whose `Host` header is not local (a guard against DNS rebinding from a browser).
