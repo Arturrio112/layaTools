@@ -110,3 +110,24 @@ def test_foreign_host_is_rejected(server):
 def test_local_host():
     assert local_host(None) and local_host("127.0.0.1:8765") and local_host("LOCALHOST") and local_host("[::1]:1")
     assert not local_host("127.0.0.1.evil.com:8765") and not local_host("attacker.test")
+
+
+def test_decide_is_logged_with_meta_and_id(server, decision_log_file):
+    from layatools import decision_log
+
+    code, out = request(server, "POST", "/v1/decide", {"profile": "support_route", "text": "x", "meta": {"ticket": "T1"}})
+    assert code == 200 and len(out["id"]) == 32
+    (row,) = decision_log.read()
+    assert row["id"] == out["id"] and row["state"] == "x" and row["meta"] == {"ticket": "T1"}
+    assert request(server, "POST", "/v1/outcome", {"id": out["id"], "outcome": {"passed": True}}) == (200, {"ok": True, "logged": True})
+    assert decision_log.read()[0]["outcome"] == {"passed": True}
+    assert request(server, "POST", "/v1/outcome", {"id": out["id"], "outcome": "nope"})[0] == 400
+
+
+def test_decide_batch_and_no_log(server, decision_log_file):
+    from layatools import decision_log
+
+    code, out = request(server, "POST", "/v1/decide", {"profile": "support_route", "items": ["a", {"message": "b"}], "log": False})
+    assert code == 200 and len(out) == 2 and all("id" not in r for r in out)
+    assert decision_log.read() == []
+    assert request(server, "POST", "/v1/decide", {"profile": "support_route", "items": "a"})[0] == 400

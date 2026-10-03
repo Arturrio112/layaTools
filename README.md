@@ -22,6 +22,36 @@ Result shape:
 {"answers": {"department": {"value": "billing", "conf": 0.94}}, "escalate": []}
 ```
 
+## Decision log, outcomes and calibration
+
+A profile is only worth acting on where it is right often enough, so every decision is logged
+(`~/.local/share/layatools/decisions.jsonl`; `LAYATOOLS_DECISION_LOG=<file>` or `off`) and returned with an
+`id`. When the caller learns what the right answer was, it records an outcome against that id; `eval` then
+measures the profile and picks its confidence threshold.
+
+```bash
+uv run layatools decide support_route "..." --meta '{"ticket": "T1"}'   # -> {"id": ..., "answers": ..., "escalate": [...]}
+uv run layatools outcome <id> '{"labels": {"department": "technical"}}'
+uv run layatools eval support_route [labeled.jsonl] --target-precision 0.9 [--table]
+uv run layatools export --profile support_route --with-outcome        # decisions joined with outcomes, JSONL
+```
+
+`eval` reads `{"text"|"state": ..., "labels": {qid: value}}` lines, or, without a file, the logged decisions
+whose outcome has `labels`. It reports accuracy per question and the lowest `min_confidence` whose precision
+reaches the target (answers below it go to the LLM via `escalate`), with the share of answers that clears it.
+Over HTTP: `POST /v1/decide` takes `meta`, `"log": false`, and a batch as `"items": [...]`; `POST /v1/outcome
+{id, outcome}` records an outcome. The MCP server offers `list_decisions`, `decide`, `record_outcome` and
+`search` (runs `lt search --json`), so any MCP-capable harness gets search and decisions with one config entry.
+
+`examples/profiles/` has two uncalibrated, shadow-only profiles for agent supervisors (after Firstmate's
+watch engine): `status_triage` (does this status/log line need a person?) and `stall_triage` (a step went
+silent: waiting, stuck or finished?). Enable with `LAYATOOLS_PROFILES=examples/profiles` or copy them into a
+project's `.layatools/profiles/`.
+
+Shadow mode is the intended way to adopt a profile: the caller asks, logs, and keeps doing what it did
+before, until `eval` on real outcomes shows the profile can be trusted. The landing-page factory does this for
+model routing (`lib/laya.mjs` and `.layatools/profiles/step_route.yaml` there).
+
 ## Profiles
 
 Laya's built-in presets (`guard`, `moderation`, `triage`, `model_router`, `email`) and the shipped

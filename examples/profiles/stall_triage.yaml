@@ -1,0 +1,20 @@
+# Example profile, UNCALIBRATED: shadow only (see status_triage.yaml).
+#
+# After Firstmate's quiet-worker ladder: a step has printed nothing for a while and the
+# evidence (CPU, open tool calls, file writes) didn't settle it. Given the step's last output
+# lines, is it waiting on something legitimate, stuck, or already finished? The landing-page
+# factory asks this in shadow mode when its silence ladder reports a step (the answer is
+# stored on the inbox row, never acted on).
+name: stall_triage
+description: A step went silent; from its last output, is it waiting, stuck or finished? (example; uncalibrated, shadow only)
+min_confidence: 0.85
+state_field: tail
+questions:
+  state:
+    type: choice
+    instructions: Judging only from `tail` (the last output lines before the silence), what is the step doing?
+    criteria:
+      waiting: a long command, test run, build or download is still going
+      stuck: it is waiting on input that won't come, looping, hung, or a tool call never returned
+      finished: it has already produced its final answer or result
+      unclear: the lines don't say
