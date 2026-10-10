@@ -38,7 +38,7 @@ def labelled_examples(profile: str, path: str | None, log: Path | None = None) -
 
 
 def _eval(args, cwd: str) -> dict:
-    log = Path(args.log) if args.log else None
+    log = args.log_file
     baseline = calibrate.baseline_agreement(decision_log.read(log, profile=args.profile))
     examples = labelled_examples(args.profile, args.labeled, log)
     if not examples:
@@ -56,6 +56,18 @@ def _eval(args, cwd: str) -> dict:
     if baseline:
         report["baseline_agreement"] = baseline
     return report
+
+
+def _log_arg(parser, value: str | None) -> Path | None:
+    try:
+        return decision_log.resolve_path(value)
+    except ValueError as exc:
+        parser.error(str(exc))
+
+
+def _duration(text: str) -> float:
+    unit = {"d": 86400, "h": 3600}.get(text[-1:], None)
+    return float(text[:-1] if unit else text) * (unit or 86400)  # bare numbers are days
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -98,9 +110,20 @@ def main(argv: list[str] | None = None) -> None:
     rank.add_argument("files", nargs="+")
     rank.add_argument("--limit", type=int, default=10)
 
+    pr = sub.add_parser("prune", help="drop old decisions from a log (labelled ones are kept); atomic rewrite")
+    pr.add_argument("--log", help="a log file under the log root (relative to it, or absolute inside it)")
+    pr.add_argument("--all", action="store_true", help="the global log and every *.jsonl under the log root")
+    pr.add_argument("--older-than", default="90d", help="age cutoff, e.g. 90d or 12h (default 90d)")
+    pr.add_argument("--keep-labelled", action=argparse.BooleanOptionalAction, default=True,
+                    help="keep decisions that have an outcome with labels (default)")
+    pr.add_argument("--max-mb", type=float, help="also drop the oldest unlabelled decisions until the file fits")
+    pr.add_argument("--dry-run", action="store_true", help="report what would go; change nothing")
+
     sub.add_parser("serve", help="serve over MCP (stdio)")
     sub.add_parser("serve-http", help="run the warm local endpoint in the foreground")
     args = parser.parse_args(argv)
+    if args.cmd in {"outcome", "eval", "export", "prune"}:
+        args.log_file = _log_arg(parser, args.log)
 
     cwd = str(Path.cwd())
     if args.cmd == "list":
@@ -124,13 +147,22 @@ def main(argv: list[str] | None = None) -> None:
     elif args.cmd == "outcome":
         if not isinstance(args.outcome, dict):
             parser.error("outcome must be a JSON object")
-        print(json.dumps({"logged": decision_log.log_outcome(args.id, args.outcome, Path(args.log) if args.log else None)}))
+        print(json.dumps({"logged": decision_log.log_outcome(args.id, args.outcome, args.log_file)}))
     elif args.cmd == "eval":
         print(json.dumps(_eval(args, cwd), indent=None if not args.table else 1))
     elif args.cmd == "export":
-        for rec in decision_log.read(Path(args.log) if args.log else None, profile=args.profile):
+        for rec in decision_log.read(args.log_file, profile=args.profile):
             if rec["outcome"] is not None or not args.with_outcome:
                 print(json.dumps(rec, ensure_ascii=False))
+    elif args.cmd == "prune":
+        if bool(args.log) == bool(args.all):
+            parser.error("give exactly one of --log or --all")
+        paths = [args.log_file] if args.log else ([decision_log.log_path()] if decision_log.log_path() else [])
+        if args.all:
+            paths += sorted(p for p in decision_log.log_root().rglob("*.jsonl") if p != decision_log.log_path())
+        cutoff = _duration(args.older_than)
+        max_bytes = int(args.max_mb * 1024 * 1024) if args.max_mb is not None else None
+        print(json.dumps([decision_log.prune(p, cutoff, args.keep_labelled, max_bytes, args.dry_run) for p in paths]))
     elif args.cmd == "serve":
         from .server import build_server
 

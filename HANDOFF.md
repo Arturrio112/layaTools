@@ -162,8 +162,10 @@ Triggered by a consumer running shadow mode on client copy and filling the one g
 `/v1/decide`: `log_path`, `redact`, `baseline`, batch `metas`/`baselines`; `/v1/rank`: opt-in `log` -> `log_id` per row;
 `/v1/outcome`: `log_path`; `eval`/`export`/`outcome` CLI: `--log`; `eval` reports `baseline_agreement`. Shapes in the
 README. Redacted records have `redacted: true` + `state_sha256` and no `state`, so `eval` skips them for re-running.
-`log_path` lets any local caller of the (unauthenticated, loopback) daemon append to any absolute path it can write.
-Tests: `uv run pytest -q` 40 pass.
+Review follow-up: `log_path`/`--log` are confined to `LAYATOOLS_LOG_ROOT` (default `~/.local/share/layatools/logs/`,
+realpath check, relative = under the root), which replaces the "append anywhere" concern above. `layatools prune`
+and `LAYATOOLS_PRUNE_DAYS` (daemon start, root files only; global needs `LAYATOOLS_PRUNE_GLOBAL=1`) keep labelled data.
+Tests: `uv run pytest -q` 44 pass.
 
 ## Not built / open ideas
 

@@ -45,8 +45,12 @@ Over HTTP: `POST /v1/decide` takes `meta`, `"log": false`, and a batch as `"item
 Privacy and shadow mode (all optional, default behaviour unchanged). On `/v1/decide` (CLI: `--no-log`,
 `--log-path`, `--redact`, `--baseline`; the MCP `decide` tool takes the same as arguments):
 
-- `"log": false` skips the log. `"log_path": "/abs/file.jsonl"` appends there instead of the global log (must be
-  absolute with an existing parent, else 400); give the same `log_path` to `/v1/outcome` and to `eval`/`export --log`.
+- `"log": false` skips the log. `"log_path": "factory/site.jsonl"` appends there instead of the global log. It is
+  confined to the log root (`LAYATOOLS_LOG_ROOT`, default `~/.local/share/layatools/logs/`): a relative path is
+  relative to the root, an absolute one must already be inside it, and the real path (symlinks resolved, `..`
+  collapsed) must stay inside, else 400 naming the root. Subdirectories are created. Give the same `log_path` to
+  `/v1/outcome` and `--log` to `eval`/`export`/`outcome`/`prune` (same rule); the global log is not reachable by
+  `--log` (omit it).
 - `"redact": true` logs answers, confidences, profile, meta and `state_sha256` (sha256 of the text, or of the
   key-sorted JSON of a state object), never the input. `eval` cannot re-run redacted decisions (no text), so keep
   labels in a file or use unredacted logs for labelled evals. Keep client text out of `meta` too.
@@ -58,7 +62,16 @@ Privacy and shadow mode (all optional, default behaviour unchanged). On `/v1/dec
   result row; `log_path`, `redact` and `meta` apply. Record outcomes against `log_id`.
 - `layatools eval <profile> --log <file>` and `export --log <file>` read that file; when records have baselines
   `eval` adds `baseline_agreement` (per question: Laya-vs-baseline `agreement`, plus both accuracies against any
-  outcome `labels`). The MCP server offers `list_decisions`, `decide`, `record_outcome` and
+  outcome `labels`).
+
+Pruning: logs only grow, so `layatools prune (--log <file> | --all) [--older-than 90d] [--no-keep-labelled]
+[--max-mb N] [--dry-run]` drops decisions older than the cutoff with their outcome rows, always keeping decisions
+that have an outcome with `labels` (the expensive data) unless `--no-keep-labelled`; `--max-mb` then also drops the
+oldest unlabelled ones until the file fits. It rewrites via temp file + rename, never in place, and prints
+before/after decision, outcome and byte counts per file; `--dry-run` changes nothing. `--all` = the global log plus
+every `*.jsonl` under the log root. Automatic: set `LAYATOOLS_PRUNE_DAYS=90` and the daemon prunes the files under
+the log root at start-up (the global log only with `LAYATOOLS_PRUNE_GLOBAL=1`). Prune while no other process writes
+the same file: the rename can lose a record appended by another process during the rewrite. The MCP server offers `list_decisions`, `decide`, `record_outcome` and
 `search` (runs `lt search --json`), so any MCP-capable harness gets search and decisions with one config entry.
 
 `examples/profiles/` has two uncalibrated, shadow-only profiles for agent supervisors (after Firstmate's

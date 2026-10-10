@@ -35,17 +35,24 @@ def log_path() -> Path | None:
     return Path(value).expanduser() if value else DEFAULT_PATH
 
 
+def log_root() -> Path:
+    """Per-request log files must live under this directory: `LAYATOOLS_LOG_ROOT`, default ~/.local/share/layatools/logs."""
+    value = os.environ.get("LAYATOOLS_LOG_ROOT")
+    return (Path(value).expanduser() if value else DEFAULT_PATH.parent / "logs").resolve()
+
+
 def resolve_path(value: Any) -> Path | None:
-    """A per-request log file: None when not given; otherwise an absolute path whose parent directory exists."""
+    """A per-request log file: None when not given. Relative paths are relative to the log root; the real path
+    (symlinks resolved, `..` collapsed) must be a file inside the root, else ValueError naming the root.
+    Subdirectories are created on first write."""
     if value is None:
         return None
+    root = log_root()
     if not isinstance(value, str) or not value:
-        raise ValueError("`log_path` must be a non-empty string")
-    path = Path(value)
-    if not path.is_absolute():
-        raise ValueError("`log_path` must be an absolute path")
-    if not path.parent.is_dir():
-        raise ValueError(f"`log_path` parent directory does not exist: {path.parent}")
+        raise ValueError(f"`log_path` must be a non-empty string naming a file under {root}")
+    path = (root / Path(value).expanduser()).resolve()  # an absolute value replaces the root, then is checked below
+    if root not in path.parents:
+        raise ValueError(f"`log_path` must resolve to a file inside the log root {root} (LAYATOOLS_LOG_ROOT)")
     return path
 
 
@@ -132,3 +139,67 @@ def read(path: Path | None = None, profile: str | None = None) -> list[dict[str,
         for i, d in decisions.items()
         if profile is None or d.get("profile") == profile
     ]
+
+
+def _count(lines: list[tuple[str, dict[str, Any] | None]]) -> dict[str, int]:
+    recs = [r for _, r in lines if r]
+    return {"decisions": sum(r.get("type") == "decision" for r in recs),
+            "outcomes": sum(r.get("type") == "outcome" for r in recs), "bytes": sum(len(t.encode()) for t, _ in lines)}
+
+
+def prune(
+    path: Path, older_than: float, keep_labelled: bool = True, max_bytes: int | None = None,
+    dry_run: bool = False, now: float | None = None,
+) -> dict[str, Any]:
+    """Drop decisions older than `older_than` seconds (with their outcome rows), except labelled ones when
+    `keep_labelled`; then, if `max_bytes` is set, drop the oldest remaining unlabelled decisions until the file
+    fits. Torn lines are dropped. The file is rewritten via a temp file + rename, never truncated in place."""
+    cutoff = (time.time() if now is None else now) - older_than
+    report: dict[str, Any] = {"path": str(path), "dry_run": dry_run}
+    with _lock:
+        if not path.exists():
+            return {**report, "before": {"decisions": 0, "outcomes": 0, "bytes": 0}, "after": {"decisions": 0, "outcomes": 0, "bytes": 0}}
+        lines: list[tuple[str, dict[str, Any] | None]] = []
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            try:
+                rec = json.loads(raw)
+            except json.JSONDecodeError:
+                rec = None
+            lines.append((raw + "\n", rec if isinstance(rec, dict) else None))
+        labelled = {r["id"] for _, r in lines if r and r.get("type") == "outcome"
+                    and isinstance((r.get("outcome") or {}).get("labels"), dict)}
+        protected = labelled if keep_labelled else set()
+        drop = {r["id"] for _, r in lines if r and r.get("type") == "decision"
+                and r.get("ts", 0) < cutoff and r["id"] not in protected}
+
+        def kept() -> list[tuple[str, dict[str, Any] | None]]:
+            return [(t, r) for t, r in lines if r and r.get("id") not in drop]
+
+        if max_bytes is not None:
+            size = _count(kept())["bytes"]
+            for t, r in lines:
+                if size <= max_bytes:
+                    break
+                if r and r.get("type") == "decision" and r["id"] not in drop and r["id"] not in protected:
+                    drop.add(r["id"])
+                    size = _count(kept())["bytes"]
+        out = kept()
+        report.update(before=_count(lines), after=_count(out))
+        if not dry_run:
+            tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex[:8]}.tmp")
+            tmp.write_text("".join(t for t, _ in out), encoding="utf-8")
+            os.replace(tmp, path)
+    return report
+
+
+def auto_prune(now: float | None = None) -> list[dict[str, Any]]:
+    """Daemon start-up pruning: `LAYATOOLS_PRUNE_DAYS` (unset = off) applied to every *.jsonl under the log root,
+    and to the global log only with `LAYATOOLS_PRUNE_GLOBAL=1`. Labelled decisions are always kept."""
+    days = os.environ.get("LAYATOOLS_PRUNE_DAYS")
+    if not days:
+        return []
+    root, global_log = log_root(), log_path()
+    paths = [p for p in sorted(root.rglob("*.jsonl")) if p.resolve() != (global_log.resolve() if global_log else None)]
+    if os.environ.get("LAYATOOLS_PRUNE_GLOBAL") == "1" and global_log:
+        paths.append(global_log)
+    return [prune(p, float(days) * 86400, now=now) for p in paths if p.is_file()]

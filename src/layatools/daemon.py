@@ -167,6 +167,7 @@ def rank(gw: Gateway, req: dict[str, Any]) -> Any:
 
 
 def serve(gateway: Gateway) -> None:
+    decision_log.auto_prune()
     ThreadingHTTPServer((HOST, PORT), make_handler(gateway)).serve_forever()
 
 

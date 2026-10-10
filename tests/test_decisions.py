@@ -106,8 +106,8 @@ def test_example_profiles_load():
     assert got["stall_triage"].state_field == "tail"
 
 
-def test_baseline_agreement_and_log_option(tmp_path, capsys):
-    own = tmp_path / "own.jsonl"
+def test_baseline_agreement_and_log_option(log_root, capsys):
+    own = log_root / "own.jsonl"
     ans = lambda v: {"answers": {"q": {"value": v, "conf": 0.9}}}  # noqa: E731
     a = decision_log.log_decision("p", "t1", ans("x"), path=own, baseline={"q": "x"})
     decision_log.log_decision("p", "t2", ans("x"), path=own, baseline={"q": {"value": "y"}})
@@ -117,16 +117,104 @@ def test_baseline_agreement_and_log_option(tmp_path, capsys):
     assert out == {"q": {"n": 2, "agreement": 0.5, "labelled": 1, "laya_accuracy": 1.0, "baseline_accuracy": 1.0}}
     assert decision_log.read() == []
 
-def test_cli_eval_and_export_read_a_given_log(tmp_path, monkeypatch, capsys):
-    own = tmp_path / "own.jsonl"
+def test_cli_eval_and_export_read_a_given_log(log_root, monkeypatch, capsys):
+    own = log_root / "own.jsonl"
     a = decision_log.log_decision("p", "t1", {"answers": {"q": {"value": "x", "conf": 0.9}}}, path=own, baseline={"q": "z"})
     decision_log.log_decision("p", "hidden", {"answers": {}}, path=own, redact=True)
     decision_log.log_outcome(a, {"labels": {"q": "x"}}, own)
     monkeypatch.setattr(cli.daemon, "call", lambda path, payload: [{"answers": {"q": {"value": "x", "conf": 0.8}}}])
-    cli.main(["eval", "p", "--log", str(own)])
+    cli.main(["eval", "p", "--log", "own.jsonl"])
     out = json.loads(capsys.readouterr().out)
     assert out["q"]["accuracy"] == 1.0 and out["baseline_agreement"]["q"]["agreement"] == 0.0
-    cli.main(["export", "--log", str(own), "--with-outcome"])
+    cli.main(["export", "--log", "own.jsonl", "--with-outcome"])
     assert [json.loads(line)["id"] for line in capsys.readouterr().out.splitlines()] == [a]
-    cli.main(["outcome", a, '{"passed": true}', "--log", str(own)])
+    cli.main(["outcome", a, '{"passed": true}', "--log", "own.jsonl"])
     assert decision_log.read(own)[0]["outcome"] == {"passed": True}
+
+
+def test_cli_log_args_are_confined(log_root, tmp_path, capsys):
+    import pytest
+
+    for argv in (["export", "--log", str(tmp_path / "x.jsonl")], ["eval", "p", "--log", "../x.jsonl"],
+                 ["outcome", "i", "{}", "--log", "/etc/x"], ["prune", "--log", "../x.jsonl"]):
+        with pytest.raises(SystemExit):
+            cli.main(argv)
+        assert str(log_root) in capsys.readouterr().err
+
+
+DAY = 86400
+
+
+def _seed(path, now):
+    """old unlabelled, old labelled (+2 outcomes), old with unlabelled outcome, recent; returns ids."""
+    ids = {}
+    for name, age in (("old", 100), ("old_labelled", 120), ("old_outcome", 110), ("recent", 1)):
+        ids[name] = decision_log.log_decision("p", name * 50, {"answers": {}}, path=path)
+    # rewrite timestamps (ts is set at write time)
+    lines = [json.loads(line) for line in path.read_text().splitlines()]
+    ages = {ids["old"]: 100, ids["old_labelled"]: 120, ids["old_outcome"]: 110, ids["recent"]: 1}
+    for rec in lines:
+        rec["ts"] = now - ages[rec["id"]] * DAY
+    path.write_text("".join(json.dumps(r) + "\n" for r in lines))
+    decision_log.log_outcome(ids["old_labelled"], {"labels": {"q": "x"}}, path)
+    decision_log.log_outcome(ids["old_outcome"], {"passed": True}, path)
+    return ids
+
+
+def test_prune_keeps_recent_and_labelled(log_root):
+    import time
+
+    now = time.time()
+    path = log_root / "a.jsonl"
+    ids = _seed(path, now)
+    before = path.read_bytes()
+    dry = decision_log.prune(path, 90 * DAY, dry_run=True, now=now)
+    assert path.read_bytes() == before and dry["after"]["decisions"] == 2 and dry["before"]["decisions"] == 4
+    out = decision_log.prune(path, 90 * DAY, now=now)
+    assert {r["id"] for r in decision_log.read(path)} == {ids["old_labelled"], ids["recent"]}
+    assert decision_log.read(path)[0]["outcome"] == {"labels": {"q": "x"}}
+    assert out["after"]["outcomes"] == 1 and out["after"]["bytes"] == path.stat().st_size < out["before"]["bytes"]
+    assert not list(log_root.glob("*.tmp*"))  # atomic rewrite leaves no temp file
+    decision_log.prune(path, 90 * DAY, keep_labelled=False, now=now)
+    assert [r["id"] for r in decision_log.read(path)] == [ids["recent"]]
+
+
+def test_prune_max_mb_trims_oldest_unlabelled(log_root):
+    import time
+
+    now = time.time()
+    path = log_root / "b.jsonl"
+    ids = _seed(path, now)
+    one = len(json.dumps(decision_log.read(path)[3]))  # about one recent record
+    limit = path.stat().st_size - 1
+    out = decision_log.prune(path, 1000 * DAY, max_bytes=limit, now=now)  # age alone removes nothing
+    kept = [r["id"] for r in decision_log.read(path)]
+    assert ids["old"] not in kept and ids["old_labelled"] in kept and ids["recent"] in kept
+    assert out["after"]["bytes"] <= limit and one > 0
+
+
+def test_cli_prune_and_auto_prune(log_root, monkeypatch, capsys):
+    import time
+
+    now = time.time()
+    sub = log_root / "factory" / "c.jsonl"
+    sub.parent.mkdir()
+    _seed(sub, now)
+    glob = decision_log.log_path()
+    _seed(glob, now)
+    cli.main(["prune", "--log", "factory/c.jsonl", "--older-than", "90d", "--dry-run"])
+    rep = json.loads(capsys.readouterr().out)
+    assert rep[0]["dry_run"] and rep[0]["before"]["decisions"] == 4 and len(decision_log.read(sub)) == 4
+    monkeypatch.delenv("LAYATOOLS_PRUNE_DAYS", raising=False)
+    assert decision_log.auto_prune() == []  # unset = off
+    monkeypatch.setenv("LAYATOOLS_PRUNE_DAYS", "90")
+    done = decision_log.auto_prune(now=now)
+    assert [str(r["path"]) for r in done] == [str(sub)] and len(decision_log.read(sub)) == 2
+    assert len(decision_log.read(glob)) == 4  # the global log is only pruned when opted in
+    monkeypatch.setenv("LAYATOOLS_PRUNE_GLOBAL", "1")
+    decision_log.auto_prune(now=now)
+    assert len(decision_log.read(glob)) == 2
+    cli.main(["prune", "--all", "--older-than", "10d", "--no-keep-labelled"])
+    assert len(decision_log.read(glob)) == 1
+    with __import__("pytest").raises(SystemExit):
+        cli.main(["prune"])  # needs --log or --all

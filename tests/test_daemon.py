@@ -133,13 +133,13 @@ def test_decide_batch_and_no_log(server, decision_log_file):
     assert request(server, "POST", "/v1/decide", {"profile": "support_route", "items": "a"})[0] == 400
 
 
-def test_log_path_redact_and_baseline(server, decision_log_file, tmp_path):
+def test_log_path_redact_and_baseline(server, decision_log_file, log_root):
     import hashlib
 
     from layatools import decision_log
 
-    own = tmp_path / "shadow.jsonl"
-    body = {"profile": "support_route", "text": "client secret copy", "log_path": str(own), "redact": True,
+    own = log_root / "factory" / "shadow.jsonl"  # sent relative to the root; subdirectories are created
+    body = {"profile": "support_route", "text": "client secret copy", "log_path": "factory/shadow.jsonl", "redact": True,
             "meta": {"k": 1}, "baseline": {"department": {"value": "billing"}}}
     code, out = request(server, "POST", "/v1/decide", body)
     assert code == 200 and decision_log.read() == []  # the global log is untouched
@@ -149,14 +149,23 @@ def test_log_path_redact_and_baseline(server, decision_log_file, tmp_path):
     assert "client secret" not in own.read_text()
     assert row["baseline"] == {"department": {"value": "billing"}} and row["answers"] and row["meta"] == {"k": 1}
     # outcomes go to the same file
-    assert request(server, "POST", "/v1/outcome", {"id": out["id"], "outcome": {"ok": 1}, "log_path": str(own)})[0] == 200
+    assert request(server, "POST", "/v1/outcome", {"id": out["id"], "outcome": {"ok": 1}, "log_path": "factory/shadow.jsonl"})[0] == 200
     assert decision_log.read(own)[0]["outcome"] == {"ok": 1}
 
 
-def test_log_path_is_validated(server, tmp_path):
-    for bad in ("relative.jsonl", str(tmp_path / "nodir" / "x.jsonl"), 5):
-        code, out = request(server, "POST", "/v1/decide", {"profile": "support_route", "text": "x", "log_path": bad})
-        assert code == 400 and "log_path" in out["error"]
+def test_log_path_is_confined_to_the_root(server, tmp_path, log_root):
+    (log_root / "link").symlink_to(tmp_path)  # a symlink out of the root must not work
+    inside = str(log_root / "abs.jsonl")
+    assert request(server, "POST", "/v1/decide", {"profile": "support_route", "text": "x", "log_path": inside})[0] == 200
+    for bad in ("../escape.jsonl", "a/../../escape.jsonl", str(tmp_path / "x.jsonl"), "/etc/passwd", "link/x.jsonl", 5, ""):
+        for path, body in (("/v1/decide", {"profile": "support_route", "text": "x"}),
+                           ("/v1/rank", {"task": "t", "items": {"a": "b"}, "log": True}),
+                           ("/v1/outcome", {"id": "i", "outcome": {}})):
+            code, out = request(server, "POST", path, {**body, "log_path": bad})
+            assert code == 400 and "log_path" in out["error"], (path, bad)
+            if isinstance(bad, str) and bad:
+                assert str(log_root) in out["error"]
+    assert not (tmp_path / "escape.jsonl").exists() and not (tmp_path / "x.jsonl").exists()
 
 
 def test_batch_per_item_meta_and_baseline(server, decision_log_file):
