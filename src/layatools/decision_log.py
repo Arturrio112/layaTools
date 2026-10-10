@@ -5,12 +5,14 @@ things went (the ticket passed, the file was the right one), it records an outco
 `read` joins the two; `layatools eval`/`export` build on that.
 
 One JSON object per line:
-  {"type": "decision", "id", "ts", "profile", "state", "answers", "escalate", "meta"}
+  {"type": "decision", "id", "ts", "profile", "state", "answers", "escalate", "meta"[, "baseline"]}
+  a redacted decision has `"redacted": true` and `"state_sha256"` instead of `state`
   {"type": "outcome",  "id", "ts", "outcome"}
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import threading
@@ -31,6 +33,25 @@ def log_path() -> Path | None:
     if value and value.lower() in {"off", "0", "none", "false"}:
         return None
     return Path(value).expanduser() if value else DEFAULT_PATH
+
+
+def resolve_path(value: Any) -> Path | None:
+    """A per-request log file: None when not given; otherwise an absolute path whose parent directory exists."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise ValueError("`log_path` must be a non-empty string")
+    path = Path(value)
+    if not path.is_absolute():
+        raise ValueError("`log_path` must be an absolute path")
+    if not path.parent.is_dir():
+        raise ValueError(f"`log_path` parent directory does not exist: {path.parent}")
+    return path
+
+
+def state_hash(state: Any) -> str:
+    text = state if isinstance(state, str) else json.dumps(state, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _clip(state: Any) -> Any:
@@ -59,15 +80,25 @@ def _append(record: dict[str, Any], path: Path | None) -> bool:
 
 
 def log_decision(
-    profile: str, state: Any, result: dict[str, Any], meta: dict[str, Any] | None = None, path: Path | None = None
+    profile: str, state: Any, result: dict[str, Any], meta: dict[str, Any] | None = None, path: Path | None = None,
+    baseline: dict[str, Any] | None = None, redact: bool = False,
 ) -> str | None:
-    """Record one decision; returns its id, or None when logging is off."""
+    """Record one decision; returns its id, or None when logging is off. `baseline` is the caller's own
+    answer (same shape as `answers`). With `redact`, only a sha256 of the input is stored, never the input."""
     path = path if path is not None else log_path()
     decision_id = uuid.uuid4().hex
     record = {
-        "type": "decision", "id": decision_id, "ts": time.time(), "profile": profile, "state": _clip(state),
+        "type": "decision", "id": decision_id, "ts": time.time(), "profile": profile,
         "answers": result.get("answers", {}), "escalate": result.get("escalate", []), "meta": meta or {},
     }
+    if redact:
+        record.update(redacted=True, state_sha256=state_hash(state))
+    else:
+        record["state"] = _clip(state)
+    if baseline is not None:
+        if not isinstance(baseline, dict):
+            raise ValueError("`baseline` must be a JSON object like `answers`")
+        record["baseline"] = baseline
     return decision_id if _append(record, path) else None
 
 

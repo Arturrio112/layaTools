@@ -104,3 +104,29 @@ def test_example_profiles_load():
     assert set(got) == {"status_triage", "stall_triage"}
     assert got["status_triage"].summary()["answers"]["kind"] == "choice: decision|finished|error|waiting|routine"
     assert got["stall_triage"].state_field == "tail"
+
+
+def test_baseline_agreement_and_log_option(tmp_path, capsys):
+    own = tmp_path / "own.jsonl"
+    ans = lambda v: {"answers": {"q": {"value": v, "conf": 0.9}}}  # noqa: E731
+    a = decision_log.log_decision("p", "t1", ans("x"), path=own, baseline={"q": "x"})
+    decision_log.log_decision("p", "t2", ans("x"), path=own, baseline={"q": {"value": "y"}})
+    decision_log.log_decision("p", "t3", ans("x"), path=own)  # no baseline: not counted
+    decision_log.log_outcome(a, {"labels": {"q": "x"}}, own)
+    out = calibrate.baseline_agreement(decision_log.read(own))
+    assert out == {"q": {"n": 2, "agreement": 0.5, "labelled": 1, "laya_accuracy": 1.0, "baseline_accuracy": 1.0}}
+    assert decision_log.read() == []
+
+def test_cli_eval_and_export_read_a_given_log(tmp_path, monkeypatch, capsys):
+    own = tmp_path / "own.jsonl"
+    a = decision_log.log_decision("p", "t1", {"answers": {"q": {"value": "x", "conf": 0.9}}}, path=own, baseline={"q": "z"})
+    decision_log.log_decision("p", "hidden", {"answers": {}}, path=own, redact=True)
+    decision_log.log_outcome(a, {"labels": {"q": "x"}}, own)
+    monkeypatch.setattr(cli.daemon, "call", lambda path, payload: [{"answers": {"q": {"value": "x", "conf": 0.8}}}])
+    cli.main(["eval", "p", "--log", str(own)])
+    out = json.loads(capsys.readouterr().out)
+    assert out["q"]["accuracy"] == 1.0 and out["baseline_agreement"]["q"]["agreement"] == 0.0
+    cli.main(["export", "--log", str(own), "--with-outcome"])
+    assert [json.loads(line)["id"] for line in capsys.readouterr().out.splitlines()] == [a]
+    cli.main(["outcome", a, '{"passed": true}', "--log", str(own)])
+    assert decision_log.read(own)[0]["outcome"] == {"passed": True}

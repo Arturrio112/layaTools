@@ -63,3 +63,31 @@ def evaluate(results: list[dict[str, Any]], labels: list[dict[str, Any]], target
             if ans is not None:
                 per_q.setdefault(qid, []).append((ans["value"], float(ans["conf"]), label))
     return {qid: calibrate(pairs, target) for qid, pairs in per_q.items()}
+
+
+def baseline_agreement(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Laya vs the caller's own rule answer (`baseline`, logged with each decision), per question.
+    `agreement` = share of baselined answers where both agree; when an outcome has `labels`, each side's
+    accuracy against them is added. A baseline value is either the bare value or `{"value": ...}`."""
+    per_q: dict[str, dict[str, int]] = {}
+    for rec in records:
+        labels = (rec.get("outcome") or {}).get("labels") if isinstance(rec.get("outcome"), dict) else None
+        for qid, base in (rec.get("baseline") or {}).items():
+            ans = rec.get("answers", {}).get(qid)
+            if ans is None:
+                continue
+            base = base["value"] if isinstance(base, dict) and "value" in base else base
+            row = per_q.setdefault(qid, dict.fromkeys(("n", "agree", "labelled", "laya_right", "baseline_right"), 0))
+            row["n"] += 1
+            row["agree"] += correct(ans["value"], base)
+            if isinstance(labels, dict) and qid in labels:
+                row["labelled"] += 1
+                row["laya_right"] += correct(ans["value"], labels[qid])
+                row["baseline_right"] += correct(base, labels[qid])
+    out = {}
+    for qid, r in per_q.items():
+        out[qid] = {"n": r["n"], "agreement": round(r["agree"] / r["n"], 3), "labelled": r["labelled"]}
+        if r["labelled"]:
+            out[qid]["laya_accuracy"] = round(r["laya_right"] / r["labelled"], 3)
+            out[qid]["baseline_accuracy"] = round(r["baseline_right"] / r["labelled"], 3)
+    return out

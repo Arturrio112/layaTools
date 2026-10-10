@@ -131,3 +131,56 @@ def test_decide_batch_and_no_log(server, decision_log_file):
     assert code == 200 and len(out) == 2 and all("id" not in r for r in out)
     assert decision_log.read() == []
     assert request(server, "POST", "/v1/decide", {"profile": "support_route", "items": "a"})[0] == 400
+
+
+def test_log_path_redact_and_baseline(server, decision_log_file, tmp_path):
+    import hashlib
+
+    from layatools import decision_log
+
+    own = tmp_path / "shadow.jsonl"
+    body = {"profile": "support_route", "text": "client secret copy", "log_path": str(own), "redact": True,
+            "meta": {"k": 1}, "baseline": {"department": {"value": "billing"}}}
+    code, out = request(server, "POST", "/v1/decide", body)
+    assert code == 200 and decision_log.read() == []  # the global log is untouched
+    (row,) = decision_log.read(own)
+    assert row["id"] == out["id"] and row["redacted"] and "state" not in row
+    assert row["state_sha256"] == hashlib.sha256(b"client secret copy").hexdigest()
+    assert "client secret" not in own.read_text()
+    assert row["baseline"] == {"department": {"value": "billing"}} and row["answers"] and row["meta"] == {"k": 1}
+    # outcomes go to the same file
+    assert request(server, "POST", "/v1/outcome", {"id": out["id"], "outcome": {"ok": 1}, "log_path": str(own)})[0] == 200
+    assert decision_log.read(own)[0]["outcome"] == {"ok": 1}
+
+
+def test_log_path_is_validated(server, tmp_path):
+    for bad in ("relative.jsonl", str(tmp_path / "nodir" / "x.jsonl"), 5):
+        code, out = request(server, "POST", "/v1/decide", {"profile": "support_route", "text": "x", "log_path": bad})
+        assert code == 400 and "log_path" in out["error"]
+
+
+def test_batch_per_item_meta_and_baseline(server, decision_log_file):
+    from layatools import decision_log
+
+    code, out = request(server, "POST", "/v1/decide", {
+        "profile": "support_route", "items": ["a", "b"], "meta": {"run": 1},
+        "metas": [{"page": "home"}, None], "baselines": [{"department": "billing"}, {"department": "sales"}]})
+    assert code == 200 and len(out) == 2
+    a, b = decision_log.read()
+    assert a["meta"] == {"run": 1, "page": "home"} and b["meta"] == {"run": 1}
+    assert a["baseline"] == {"department": "billing"} and b["baseline"] == {"department": "sales"}
+    bad = {"profile": "support_route", "items": ["a", "b"], "metas": [{}]}
+    assert request(server, "POST", "/v1/decide", bad)[0] == 400
+
+
+def test_rank_logging_is_opt_in(server, decision_log_file):
+    from layatools import decision_log
+
+    body = {"task": "fix login", "items": {"a": "x", "b": "auth"}}
+    code, out = request(server, "POST", "/v1/rank", body)
+    assert code == 200 and all("log_id" not in r for r in out) and decision_log.read() == []
+    code, out = request(server, "POST", "/v1/rank", {**body, "log": True, "redact": True})
+    rows = {r["id"]: r for r in decision_log.read()}
+    assert [r["id"] for r in out] == ["b", "a"] and set(rows) == {r["log_id"] for r in out}
+    top = rows[out[0]["log_id"]]
+    assert top["meta"]["item"] == "b" and top["answers"]["relevance"]["value"] == out[0]["score"] and "state" not in top

@@ -82,14 +82,13 @@ def make_handler(gateway: Gateway, embedder: Any = None) -> type[BaseHTTPRequest
                     return self._send(200, {"model": embedder.model_name, **pack(vecs)})
                 gw = gateway_for(req.get("cwd"))
                 if self.path == "/v1/outcome":
-                    return self._send(200, {"ok": True, "logged": decision_log.log_outcome(req["id"], req["outcome"])})
+                    path = decision_log.resolve_path(req.get("log_path"))
+                    return self._send(200, {"ok": True, "logged": decision_log.log_outcome(req["id"], req["outcome"], path)})
                 with lock:
                     if self.path == "/v1/decide":
                         out = decide(gw, req)
                     elif self.path == "/v1/rank":
-                        out = gw.rank(
-                            req["task"], req["items"], req.get("profile", "relevance"), req.get("limit")
-                        )
+                        out = rank(gw, req)
                     else:
                         return self._send(404, {"error": "not found"})
                 self._send(200, out)
@@ -104,24 +103,67 @@ def make_handler(gateway: Gateway, embedder: Any = None) -> type[BaseHTTPRequest
     return Handler
 
 
+def _log_opts(req: dict[str, Any]) -> tuple[bool, Path | None, bool]:
+    """(log?, per-request log file or None for the global log, redact?). `log_path` is validated here."""
+    return bool(req.get("log", True)), decision_log.resolve_path(req.get("log_path")), bool(req.get("redact"))
+
+
+def _per_item(req: dict[str, Any], key: str, n: int) -> list[Any]:
+    values = req.get(key)
+    if values is None:
+        return [None] * n
+    if not isinstance(values, list) or len(values) != n:
+        raise ValueError(f"`{key}` must be a list with one entry per item")
+    return values
+
+
 def decide(gw: Gateway, req: dict[str, Any]) -> Any:
     """One item (`text` or `state`) or a batch (`items`: a list of texts/states, answered in order).
-    Each answer is logged with `meta` unless `"log": false`, and carries its log `id` for outcomes."""
+    Each answer is logged unless `"log": false`, and carries its log `id` for outcomes. Log options:
+    `log_path` (append there instead of the global log), `redact` (store a sha256 of the input, not the input),
+    `meta` and `baseline` (the caller's own answer, shaped like `answers`); a batch may instead give
+    `metas` / `baselines`, lists with one entry per item (a per-item meta is merged over `meta`)."""
     batch = "items" in req
     items = req["items"] if batch else [req.get("state", req.get("text"))]
     if not isinstance(items, list) or any(not isinstance(i, (str, dict)) for i in items):
         raise ValueError("`items` must be a list of texts or state objects")
     if not batch and items[0] is None:
         raise KeyError("text")
+    do_log, path, redact = _log_opts(req)
+    metas = _per_item(req, "metas", len(items))
+    baselines = _per_item(req, "baselines", len(items))
+    if not batch:
+        baselines = [req.get("baseline")]
+    elif req.get("baseline") is not None:
+        raise ValueError("use `baselines` (one per item) with `items`")
     out = []
-    for item in items:
+    for item, item_meta, baseline in zip(items, metas, baselines):
         result = gw.decide(req["profile"], item, req.get("min_confidence"))
-        if req.get("log", True):
-            decision_id = decision_log.log_decision(req["profile"], item, result, req.get("meta"))
+        if do_log:
+            meta = {**(req.get("meta") or {}), **(item_meta or {})}
+            decision_id = decision_log.log_decision(req["profile"], item, result, meta, path, baseline, redact)
             if decision_id:
                 result = {"id": decision_id, **result}
         out.append(result)
     return out if batch else out[0]
+
+
+def rank(gw: Gateway, req: dict[str, Any]) -> Any:
+    """Rank `items` ({id: text}) against `task`. With `"log": true` (opt-in) each ranked candidate is logged
+    as a decision of the rank profile (answer `relevance`: value = score, conf = p) and its response row gains
+    `log_id`, so outcomes can be recorded against it. `log_path`, `redact` and `meta` work as for decide."""
+    profile = req.get("profile", "relevance")
+    out = gw.rank(req["task"], req["items"], profile, req.get("limit"))
+    if req.get("log") is True:
+        _, path, redact = _log_opts(req)
+        for row in out:
+            result = {"answers": {"relevance": {"value": row["score"], "conf": row["p"]}}, "escalate": []}
+            state = {"task": req["task"], "content": req["items"][row["id"]]}
+            meta = {**(req.get("meta") or {}), "via": "rank", "item": row["id"]}
+            log_id = decision_log.log_decision(profile, state, result, meta, path, None, redact)
+            if log_id:
+                row["log_id"] = log_id
+    return out
 
 
 def serve(gateway: Gateway) -> None:

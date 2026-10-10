@@ -156,6 +156,15 @@ Base model `convaiinnovations/laya` (421M). Everything trained on the 10 OSS rep
 - Factory side of all this: `docs/HANDOFF-2026-09-30-cloud-session.md` on the factory branch.
 - Tests: `uv run pytest -q` 31 pass.
 
+## Session 4 (L1): decision-log privacy and shadow-friendliness
+
+Triggered by a consumer running shadow mode on client copy and filling the one global log with it.
+`/v1/decide`: `log_path`, `redact`, `baseline`, batch `metas`/`baselines`; `/v1/rank`: opt-in `log` -> `log_id` per row;
+`/v1/outcome`: `log_path`; `eval`/`export`/`outcome` CLI: `--log`; `eval` reports `baseline_agreement`. Shapes in the
+README. Redacted records have `redacted: true` + `state_sha256` and no `state`, so `eval` skips them for re-running.
+`log_path` lets any local caller of the (unauthenticated, loopback) daemon append to any absolute path it can write.
+Tests: `uv run pytest -q` 40 pass.
+
 ## Not built / open ideas
 
 - `lt serve` / the daemon have no auth token (loopback + Host check only).

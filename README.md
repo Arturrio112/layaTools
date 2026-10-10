@@ -40,7 +40,25 @@ uv run layatools export --profile support_route --with-outcome        # decision
 whose outcome has `labels`. It reports accuracy per question and the lowest `min_confidence` whose precision
 reaches the target (answers below it go to the LLM via `escalate`), with the share of answers that clears it.
 Over HTTP: `POST /v1/decide` takes `meta`, `"log": false`, and a batch as `"items": [...]`; `POST /v1/outcome
-{id, outcome}` records an outcome. The MCP server offers `list_decisions`, `decide`, `record_outcome` and
+{id, outcome[, log_path]}` records an outcome.
+
+Privacy and shadow mode (all optional, default behaviour unchanged). On `/v1/decide` (CLI: `--no-log`,
+`--log-path`, `--redact`, `--baseline`; the MCP `decide` tool takes the same as arguments):
+
+- `"log": false` skips the log. `"log_path": "/abs/file.jsonl"` appends there instead of the global log (must be
+  absolute with an existing parent, else 400); give the same `log_path` to `/v1/outcome` and to `eval`/`export --log`.
+- `"redact": true` logs answers, confidences, profile, meta and `state_sha256` (sha256 of the text, or of the
+  key-sorted JSON of a state object), never the input. `eval` cannot re-run redacted decisions (no text), so keep
+  labels in a file or use unredacted logs for labelled evals. Keep client text out of `meta` too.
+- `"baseline": {"department": "billing"}` is the caller's own rule answer (`{qid: value}` or `{qid: {"value": v}}`),
+  stored in the record. Batches take `"metas": [...]` and `"baselines": [...]`, one entry per item (null allowed);
+  a per-item meta is merged over `meta`.
+- `POST /v1/rank` with `"log": true` (opt-in) logs each ranked candidate as a decision of the rank profile
+  (answer `relevance`: value = score, conf = p; meta `{via: "rank", item: <id>}`) and adds `log_id` to every
+  result row; `log_path`, `redact` and `meta` apply. Record outcomes against `log_id`.
+- `layatools eval <profile> --log <file>` and `export --log <file>` read that file; when records have baselines
+  `eval` adds `baseline_agreement` (per question: Laya-vs-baseline `agreement`, plus both accuracies against any
+  outcome `labels`). The MCP server offers `list_decisions`, `decide`, `record_outcome` and
 `search` (runs `lt search --json`), so any MCP-capable harness gets search and decisions with one config entry.
 
 `examples/profiles/` has two uncalibrated, shadow-only profiles for agent supervisors (after Firstmate's
