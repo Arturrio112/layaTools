@@ -29,16 +29,24 @@ def build_server(gateway: Gateway) -> MCPServer:
         return json.dumps(gateway.list_decisions(), separators=(",", ":"))
 
     @server.tool()
-    def decide(profile: str, text: str, min_confidence: float | None = None) -> str:
+    def decide(
+        profile: str, text: str, min_confidence: float | None = None, meta: dict[str, Any] | None = None,
+        baseline: dict[str, Any] | None = None, log: bool = True, log_path: str | None = None, redact: bool = False,
+    ) -> str:
         """Classify/score `text` with a named decision profile in one cheap call (no generation).
         Answers listed under `escalate` were low confidence: decide those yourself.
-        The result's `id` can be passed to `record_outcome` once you know the right answer."""
+        The result's `id` can be passed to `record_outcome` once you know the right answer.
+        `baseline` is your own answer ({qid: value}) for later agreement reports; `log=false` skips the log,
+        `log_path` (absolute) logs to that file, `redact=true` logs a sha256 of `text` instead of the text."""
         try:
+            path = decision_log.resolve_path(log_path)
             result: dict[str, Any] = gateway.decide(profile, text, min_confidence)
-            decision_id = decision_log.log_decision(profile, text, result, {"via": "mcp"})
+            decision_id = decision_log.log_decision(
+                profile, text, result, {"via": "mcp", **(meta or {})}, path, baseline, redact
+            ) if log else None
             if decision_id:
                 result = {"id": decision_id, **result}
-        except UnknownProfile as exc:
+        except (UnknownProfile, ValueError) as exc:
             result = {"error": str(exc)}
         return json.dumps(result, separators=(",", ":"))
 
